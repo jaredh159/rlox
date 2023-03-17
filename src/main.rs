@@ -1,12 +1,16 @@
+#![allow(dead_code)]
+
 use std::env;
 
 mod err;
 mod rlox;
+mod scan;
+mod tok;
 
 fn main() {
   let args = env::args().skip(1).collect::<Vec<_>>();
   if let Err(err) = rlox::run(args) {
-    eprintln!("{}", err);
+    err.print();
     err.exit();
   }
 }

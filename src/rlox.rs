@@ -1,4 +1,5 @@
 use crate::err::LoxErr;
+use crate::scan::Scanner;
 use std::io::{self, BufRead, Write};
 
 pub fn run(args: Vec<String>) -> Result<(), LoxErr> {
@@ -15,9 +16,7 @@ pub fn run(args: Vec<String>) -> Result<(), LoxErr> {
 
 pub fn eval_file(path: &str) -> Result<(), LoxErr> {
   let source = std::fs::read_to_string(path)?;
-  // todo: handle error
-  _ = eval(source);
-  Ok(())
+  eval(source)
 }
 
 pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
@@ -28,7 +27,7 @@ pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
     println!("your line was: {}", line);
     match eval(line) {
       Ok(_) => {}
-      Err(err) => eprintln!("{}", err),
+      Err(err) => err.print(),
     }
     print!("> ");
     stdout.flush().unwrap();
@@ -36,30 +35,9 @@ pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
 }
 
 fn eval(source: String) -> Result<(), LoxErr> {
-  let scanner = Scanner::new(source);
+  let scanner = Scanner::new(&source);
   for token in scanner {
     println!("{:?}", token);
   }
   Ok(())
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-struct Token {}
-
-#[derive(Debug)]
-struct Scanner {
-  source: String,
-}
-
-impl Scanner {
-  fn new(source: String) -> Self {
-    Scanner { source }
-  }
-}
-
-impl Iterator for Scanner {
-  type Item = Token;
-  fn next(&mut self) -> Option<Token> {
-    None
-  }
 }

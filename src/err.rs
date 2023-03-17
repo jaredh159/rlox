@@ -1,5 +1,4 @@
 use std::io;
-use std::process::ExitCode;
 use std::{error::Error, fmt::Display};
 
 #[derive(Debug)]
@@ -13,7 +12,11 @@ pub enum LoxErr {
 }
 
 impl LoxErr {
-  pub fn exit(&self) -> ! {
+  pub fn print(&self) {
+    eprintln!("{}", self);
+  }
+
+  pub fn exit(self) -> ! {
     match self {
       LoxErr::Io(_) => std::process::exit(74),
       LoxErr::Scan { .. } => std::process::exit(65),
