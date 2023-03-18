@@ -39,4 +39,5 @@ pub enum Token {
   Var(usize),
   While(usize),
   Eof(usize),
+  Illegal(usize),
 }

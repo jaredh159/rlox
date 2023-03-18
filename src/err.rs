@@ -4,11 +4,7 @@ use std::{error::Error, fmt::Display};
 #[derive(Debug)]
 pub enum LoxErr {
   Io(String),
-  Scan {
-    line: u32,
-    loc: String,
-    message: String,
-  },
+  Scan { line: usize, message: String },
 }
 
 impl LoxErr {
@@ -28,7 +24,7 @@ impl Display for LoxErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       LoxErr::Io(msg) => write!(f, "IO Error: {}", msg),
-      LoxErr::Scan { line, loc, message } => write!(f, "[line {}] Error{}: {}", line, loc, message),
+      LoxErr::Scan { line, message } => write!(f, "[line {}] Error: {}", line, message),
     }
   }
 }
