@@ -32,22 +32,24 @@ impl<'a> Scanner<'a> {
     self.source.peek().is_none()
   }
 
+  fn advance(&mut self) -> Option<char> {
+    self.source.next()
+  }
+
   fn advance_if(&mut self, expected: char) -> bool {
-    let peeked = self.source.peek();
-    if peeked.is_none() || *peeked.unwrap() != expected {
+    if !self.peek_is(expected) {
       false
     } else {
-      _ = self.source.next();
+      self.advance();
       true
     }
   }
 
   fn advance_if_not(&mut self, expected: char) -> bool {
-    let peeked = self.source.peek();
-    if peeked.is_none() || *peeked.unwrap() == expected {
+    if self.peek_is(expected) {
       false
     } else {
-      _ = self.source.next();
+      self.advance();
       true
     }
   }
@@ -58,7 +60,29 @@ impl<'a> Scanner<'a> {
 
   fn advance_thru(&mut self, expected: char) {
     self.advance_until(expected);
-    _ = self.source.next(); // consume expected
+    self.advance(); // consume expected
+  }
+
+  fn peek_is(&mut self, ch: char) -> bool {
+    let peeked = self.source.peek();
+    !peeked.is_none() && *peeked.unwrap() == ch
+  }
+
+  fn string(&mut self) -> Token {
+    let mut chars: Vec<char> = Vec::new();
+    while let Some(next) = self.advance() {
+      if next == '\n' {
+        self.line += 1;
+      } else if next == '"' {
+        return Token::String(self.line, chars.iter().collect());
+      }
+      chars.push(next);
+    }
+    self.errors.push(LoxErr::Scan {
+      line: self.line,
+      message: "unterminated string".to_string(),
+    });
+    return Token::String(self.line, chars.iter().collect());
   }
 }
 
@@ -77,10 +101,15 @@ impl<'a> Iterator for Scanner<'a> {
       '+' => Token::Plus(self.line),
       ';' => Token::Semicolon(self.line),
       '*' => Token::Star(self.line),
+      '"' => self.string(),
+      ' ' | '\r' | '\t' => return self.next(),
+      '\n' => {
+        self.line += 1;
+        return self.next();
+      }
       '/' => {
         if self.advance_if('/') {
-          // incr lines?
-          self.advance_thru('\n');
+          self.advance_until('\n');
           match self.next() {
             Some(token) => token,
             None => return None,
@@ -161,6 +190,43 @@ mod tests {
   fn test_scan_comment() {
     let mut scanner = Scanner::from_str("// foo bar all a comment");
     assert!(scanner.tokens().is_empty());
+    assert!(scanner.errors.is_empty());
+  }
+
+  #[test]
+  fn test_scan_string() {
+    let mut scanner = Scanner::from_str(r#""foobar baz""#);
+    assert_eq!(
+      scanner.tokens(),
+      vec![Token::String(1, "foobar baz".to_string())]
+    );
+    assert!(scanner.errors.is_empty());
+  }
+
+  #[test]
+  fn test_scan_errors() {
+    let cases = vec![(
+      "\"unterminated string",
+      vec![LoxErr::Scan {
+        line: 1,
+        message: "unterminated string".to_string(),
+      }],
+    )];
+
+    for (input, expected_errs) in cases {
+      let mut scanner = Scanner::from_str(input);
+      scanner.tokens();
+      assert_eq!(scanner.errors, expected_errs);
+    }
+  }
+
+  #[test]
+  fn test_skips_whitespace() {
+    let mut scanner = Scanner::from_str(" ;\t;\n ;");
+    assert_eq!(
+      scanner.tokens(),
+      vec![Semicolon(1), Semicolon(1), Semicolon(2)]
+    );
     assert!(scanner.errors.is_empty());
   }
 

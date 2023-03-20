@@ -1,7 +1,7 @@
 use std::io;
 use std::{error::Error, fmt::Display};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum LoxErr {
   Io(String),
   Scan { line: usize, message: String },
