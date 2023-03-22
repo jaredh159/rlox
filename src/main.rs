@@ -3,6 +3,7 @@
 use std::env;
 
 mod err;
+mod peektwo;
 mod rlox;
 mod scan;
 mod tok;

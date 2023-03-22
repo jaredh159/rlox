@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq)]
 pub enum Token {
   LeftParen(usize),
   RightParen(usize),
@@ -21,7 +21,7 @@ pub enum Token {
   LessEqual(usize),
   Identifier(usize, String),
   String(usize, String),
-  Number(usize, String),
+  Number(usize, f64),
   And(usize),
   Class(usize),
   Else(usize),
@@ -39,5 +39,5 @@ pub enum Token {
   Var(usize),
   While(usize),
   Eof(usize),
-  Illegal(usize),
+  Illegal(usize, String),
 }

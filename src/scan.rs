@@ -1,8 +1,8 @@
-use crate::{err::LoxErr, tok::Token};
-use std::{iter::Peekable, str::Chars};
+use crate::{err::LoxErr, peektwo::PeekTwo, tok::Token};
+use std::str::Chars;
 
 pub struct Scanner<'a> {
-  source: Peekable<Chars<'a>>,
+  source: PeekTwo<Chars<'a>>,
   line: usize,
   errors: Vec<LoxErr>,
 }
@@ -10,7 +10,7 @@ pub struct Scanner<'a> {
 impl<'a> Scanner<'a> {
   pub fn new(source: &'a String) -> Self {
     Scanner {
-      source: source.chars().peekable(),
+      source: PeekTwo::new(source.chars()),
       line: 1,
       errors: vec![],
     }
@@ -18,7 +18,7 @@ impl<'a> Scanner<'a> {
 
   pub fn from_str(source: &'a str) -> Self {
     Scanner {
-      source: source.chars().peekable(),
+      source: PeekTwo::new(source.chars()),
       line: 1,
       errors: vec![],
     }
@@ -46,7 +46,7 @@ impl<'a> Scanner<'a> {
   }
 
   fn advance_if_not(&mut self, expected: char) -> bool {
-    if self.peek_is(expected) {
+    if self.is_at_end() || self.peek_is(expected) {
       false
     } else {
       self.advance();
@@ -68,6 +68,21 @@ impl<'a> Scanner<'a> {
     !peeked.is_none() && *peeked.unwrap() == ch
   }
 
+  fn peek_satisfies(&mut self, predicate: fn(&char) -> bool) -> bool {
+    let peeked = self.source.peek();
+    !peeked.is_none() && predicate(peeked.unwrap())
+  }
+
+  fn peek_next_is(&mut self, ch: char) -> bool {
+    let peeked_next = self.source.peek_next();
+    !peeked_next.is_none() && *peeked_next.unwrap() == ch
+  }
+
+  fn peek_next_satisfies(&mut self, predicate: fn(&char) -> bool) -> bool {
+    let peeked_next = self.source.peek_next();
+    !peeked_next.is_none() && predicate(peeked_next.unwrap())
+  }
+
   fn string(&mut self) -> Token {
     let mut chars: Vec<char> = Vec::new();
     while let Some(next) = self.advance() {
@@ -82,7 +97,28 @@ impl<'a> Scanner<'a> {
       line: self.line,
       message: "unterminated string".to_string(),
     });
-    return Token::String(self.line, chars.iter().collect());
+    Token::String(self.line, chars.iter().collect())
+  }
+
+  fn number(&mut self, first: char) -> Token {
+    let mut chars = vec![first];
+    while self.peek_satisfies(char::is_ascii_digit) {
+      chars.push(self.advance().unwrap());
+    }
+
+    if self.peek_is('.') && self.peek_next_satisfies(char::is_ascii_digit) {
+      chars.push(self.advance().unwrap()); // consume dot
+      while self.peek_satisfies(char::is_ascii_digit) {
+        chars.push(self.advance().unwrap());
+      }
+    }
+
+    let string: String = chars.iter().collect();
+    let parse_result = string.parse::<f64>();
+    match parse_result {
+      Err(_) => Token::Illegal(self.line, string),
+      Ok(float) => Token::Number(self.line, float),
+    }
   }
 }
 
@@ -146,12 +182,13 @@ impl<'a> Iterator for Scanner<'a> {
           Token::Greater(self.line)
         }
       }
-      _ => {
+      ch if ch.is_ascii_digit() => self.number(ch),
+      ch => {
         self.errors.push(LoxErr::Scan {
           line: self.line,
           message: format!("Unexpected character: {}", char),
         });
-        Token::Illegal(self.line)
+        Token::Illegal(self.line, ch.to_string())
       }
     };
     Some(token)
@@ -199,6 +236,16 @@ mod tests {
     assert_eq!(
       scanner.tokens(),
       vec![Token::String(1, "foobar baz".to_string())]
+    );
+    assert!(scanner.errors.is_empty());
+  }
+
+  #[test]
+  fn test_scan_number() {
+    let mut scanner = Scanner::from_str("123 123.45 0.00");
+    assert_eq!(
+      scanner.tokens(),
+      vec![Number(1, 123.0), Number(1, 123.45), Number(1, 0.0)]
     );
     assert!(scanner.errors.is_empty());
   }
