@@ -1,4 +1,5 @@
 use crate::{err::LoxErr, peektwo::PeekTwo, tok::Token};
+use phf::phf_map;
 use std::str::Chars;
 
 pub struct Scanner<'a> {
@@ -6,6 +7,25 @@ pub struct Scanner<'a> {
   line: usize,
   errors: Vec<LoxErr>,
 }
+
+static KEYWORDS: phf::Map<&'static str, fn(usize) -> Token> = phf_map! {
+  "and" => |line| Token::And(line),
+  "class" => |line| Token::Class(line),
+  "else" => |line| Token::Else(line),
+  "false" => |line| Token::False(line),
+  "for" => |line| Token::For(line),
+  "fun" => |line| Token::Fun(line),
+  "if" => |line| Token::If(line),
+  "nil" => |line| Token::Nil(line),
+  "or" => |line| Token::Or(line),
+  "print" => |line| Token::Print(line),
+  "return" => |line| Token::Return(line),
+  "super" => |line| Token::Super(line),
+  "this" => |line| Token::This(line),
+  "true" => |line| Token::True(line),
+  "var" => |line| Token::Var(line),
+  "while" => |line| Token::While(line),
+};
 
 impl<'a> Scanner<'a> {
   pub fn new(source: &'a String) -> Self {
@@ -120,6 +140,18 @@ impl<'a> Scanner<'a> {
       Ok(float) => Token::Number(self.line, float),
     }
   }
+
+  fn identifier(&mut self, first: char) -> Token {
+    let mut chars = vec![first];
+    while self.peek_satisfies(is_alpha_numeric) {
+      chars.push(self.advance().unwrap());
+    }
+    let ident: String = chars.iter().collect();
+    match KEYWORDS.get(&ident) {
+      Some(make_token) => make_token(self.line),
+      None => Token::Identifier(self.line, ident),
+    }
+  }
 }
 
 impl<'a> Iterator for Scanner<'a> {
@@ -183,6 +215,7 @@ impl<'a> Iterator for Scanner<'a> {
         }
       }
       ch if ch.is_ascii_digit() => self.number(ch),
+      ch if is_alpha(&ch) => self.identifier(ch),
       ch => {
         self.errors.push(LoxErr::Scan {
           line: self.line,
@@ -193,6 +226,14 @@ impl<'a> Iterator for Scanner<'a> {
     };
     Some(token)
   }
+}
+
+fn is_alpha(ch: &char) -> bool {
+  ch.is_ascii_alphabetic() || *ch == '_'
+}
+
+fn is_alpha_numeric(ch: &char) -> bool {
+  is_alpha(ch) || ch.is_ascii_digit()
 }
 
 // tests
@@ -221,6 +262,35 @@ mod tests {
       ]
     );
     assert!(scanner.errors.is_empty());
+  }
+
+  #[test]
+  fn test_scan_identifiers() {
+    let cases = vec![
+      ("and", And(1)),
+      ("class", Class(1)),
+      ("else", Else(1)),
+      ("false", False(1)),
+      ("for", For(1)),
+      ("fun", Fun(1)),
+      ("if", If(1)),
+      ("nil", Nil(1)),
+      ("or", Or(1)),
+      ("print", Print(1)),
+      ("return", Return(1)),
+      ("super", Super(1)),
+      ("this", This(1)),
+      ("true", True(1)),
+      ("var", Var(1)),
+      ("while", While(1)),
+      ("foobar", Identifier(1, "foobar".to_string())),
+      ("_1lol", Identifier(1, "_1lol".to_string())),
+    ];
+    for (input, expected) in cases {
+      let mut scanner = Scanner::from_str(input);
+      assert_eq!(scanner.tokens(), vec![expected]);
+      assert!(scanner.errors.is_empty());
+    }
   }
 
   #[test]
