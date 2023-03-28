@@ -1,10 +1,13 @@
 use std::io;
 use std::{error::Error, fmt::Display};
 
+pub type Result<T> = std::result::Result<T, LoxErr>;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum LoxErr {
   Io(String),
   Scan { line: usize, message: String },
+  Parse(String),
 }
 
 impl LoxErr {
@@ -16,6 +19,7 @@ impl LoxErr {
     match self {
       LoxErr::Io(_) => std::process::exit(74),
       LoxErr::Scan { .. } => std::process::exit(65),
+      LoxErr::Parse(_) => std::process::exit(65),
     }
   }
 }
@@ -25,6 +29,7 @@ impl Display for LoxErr {
     match self {
       LoxErr::Io(msg) => write!(f, "IO Error: {}", msg),
       LoxErr::Scan { line, message } => write!(f, "[line {}] Error: {}", line, message),
+      LoxErr::Parse(msg) => write!(f, "Parse Error: {}", msg),
     }
   }
 }

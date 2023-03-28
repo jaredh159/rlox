@@ -1,5 +1,6 @@
 use crate::tok::Token;
 
+#[derive(Debug, PartialEq)]
 pub enum Expr {
   Binary(Binary),
   Unary(Unary),
@@ -7,22 +8,28 @@ pub enum Expr {
   Grouping(Grouping),
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Binary {
   pub left: Box<Expr>,
   pub operator: Token,
   pub right: Box<Expr>,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Unary {
   pub operator: Token,
   pub right: Box<Expr>,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Literal {
   Nil,
+  True,
+  False,
   Number(f64), // ¯\_(ツ)_/¯
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Grouping {
   pub expr: Box<Expr>,
 }

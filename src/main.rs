@@ -4,6 +4,7 @@ use std::env;
 
 mod err;
 mod expr;
+mod parse;
 mod peektwo;
 mod rlox;
 mod scan;
