@@ -7,7 +7,7 @@ pub type Result<T> = std::result::Result<T, LoxErr>;
 pub enum LoxErr {
   Io(String),
   Scan { line: usize, message: String },
-  Parse(String),
+  Parse { line: usize, message: String },
 }
 
 impl LoxErr {
@@ -19,7 +19,7 @@ impl LoxErr {
     match self {
       LoxErr::Io(_) => std::process::exit(74),
       LoxErr::Scan { .. } => std::process::exit(65),
-      LoxErr::Parse(_) => std::process::exit(65),
+      LoxErr::Parse { .. } => std::process::exit(65),
     }
   }
 }
@@ -28,8 +28,8 @@ impl Display for LoxErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       LoxErr::Io(msg) => write!(f, "IO Error: {}", msg),
-      LoxErr::Scan { line, message } => write!(f, "[line {}] Error: {}", line, message),
-      LoxErr::Parse(msg) => write!(f, "Parse Error: {}", msg),
+      LoxErr::Scan { line, message } => write!(f, "Scan Error: [line {}] {}", line, message),
+      LoxErr::Parse { line, message } => write!(f, "Parse Error: [line {}] {}", line, message),
     }
   }
 }

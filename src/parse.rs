@@ -9,12 +9,16 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
+  pub fn parse(&mut self) -> Result<Expr> {
+    self.parse_expression()
+  }
+
   fn parse_expression(&mut self) -> Result<Expr> {
     self.parse_equality()
   }
 
   fn parse_equality(&mut self) -> Result<Expr> {
-    self.parse_binary(&[Bang, BangEqual], Self::parse_comparison)
+    self.parse_binary(&[BangEqual, EqualEqual], Self::parse_comparison)
   }
 
   fn parse_comparison(&mut self) -> Result<Expr> {
@@ -68,11 +72,11 @@ impl<'a> Parser<'a> {
         _ => panic!("unreachable"),
       }
     } else if self.consume_discarding(LeftParen) {
-      Ok(Expr::Grouping(Grouping {
-        expr: Box::new(self.parse_expression()?),
-      }))
+      let expr = Box::new(self.parse_expression()?);
+      self.consume_expecting(RightParen, "expected `)` after expression")?;
+      Ok(Expr::Grouping(Grouping { expr }))
     } else {
-      Err(LoxErr::Parse("Expected an expression".to_string()))
+      Err(self.parse_error("expected an expression"))
     }
   }
 
@@ -90,7 +94,7 @@ impl<'a> Parser<'a> {
     if let Some(token) = self.consume_if(token_type) {
       Ok(token)
     } else {
-      Err(LoxErr::Parse(error_message.to_string()))
+      Err(self.parse_error(error_message))
     }
   }
 
@@ -123,6 +127,16 @@ impl<'a> Parser<'a> {
     self.tokens.peek().is_none()
   }
 
+  fn parse_error<S>(&mut self, message: S) -> LoxErr
+  where
+    S: Into<String>,
+  {
+    LoxErr::Parse {
+      line: self.tokens.peek().map(Token::line).unwrap_or(0),
+      message: message.into(),
+    }
+  }
+
   pub fn new(source: &'a String) -> Self {
     Parser {
       tokens: Scanner::new(source).peekable(),
@@ -143,11 +157,107 @@ mod tests {
   use super::*;
 
   #[test]
-  fn test_parse_true() {
-    let mut parser = Parser::from_str("true");
-    assert_eq!(
-      parser.parse_expression().unwrap(),
-      Expr::Literal(Literal::True)
-    );
+  fn test_parse_literal_exprs() {
+    assert_parsed_cases(vec![
+      ("true", Expr::Literal(Literal::True)),
+      ("false", Expr::Literal(Literal::False)),
+      ("nil", Expr::Literal(Literal::Nil)),
+      ("33.33", Expr::Literal(Literal::Number(33.33))),
+    ]);
+  }
+
+  #[test]
+  fn test_parse_unary_exprs() {
+    assert_parsed_cases(vec![
+      (
+        "!true",
+        Expr::Unary(Unary {
+          operator: Token::Bang(1),
+          right: Box::new(Expr::Literal(Literal::True)),
+        }),
+      ),
+      (
+        "-33.33",
+        Expr::Unary(Unary {
+          operator: Token::Minus(1),
+          right: Box::new(Expr::Literal(Literal::Number(33.33))),
+        }),
+      ),
+    ]);
+  }
+
+  #[test]
+  fn test_parse_binary_exprs() {
+    assert_parsed_cases(vec![
+      (
+        "true == true",
+        Expr::Binary(Binary {
+          left: Box::new(Expr::Literal(Literal::True)),
+          operator: Token::EqualEqual(1),
+          right: Box::new(Expr::Literal(Literal::True)),
+        }),
+      ),
+      (
+        "5 <= 6",
+        Expr::Binary(Binary {
+          left: Box::new(Expr::Literal(Literal::Number(5.0))),
+          operator: Token::LessEqual(1),
+          right: Box::new(Expr::Literal(Literal::Number(6.0))),
+        }),
+      ),
+    ]);
+  }
+
+  #[test]
+  fn test_parse_grouped_exprs() {
+    assert_parsed_cases(vec![
+      (
+        "(true)",
+        Expr::Grouping(Grouping {
+          expr: Box::new(Expr::Literal(Literal::True)),
+        }),
+      ),
+      (
+        "(5 <= 6)",
+        Expr::Grouping(Grouping {
+          expr: Box::new(Expr::Binary(Binary {
+            left: Box::new(Expr::Literal(Literal::Number(5.0))),
+            operator: Token::LessEqual(1),
+            right: Box::new(Expr::Literal(Literal::Number(6.0))),
+          })),
+        }),
+      ),
+    ]);
+  }
+
+  #[test]
+  fn test_parse_errors() {
+    let cases = vec![
+      (
+        "(true;",
+        LoxErr::Parse {
+          line: 1,
+          message: "expected `)` after expression".to_string(),
+        },
+      ),
+      (
+        "*;",
+        LoxErr::Parse {
+          line: 1,
+          message: "expected an expression".to_string(),
+        },
+      ),
+    ];
+    for (input, expected_err) in cases {
+      let mut parser = Parser::from_str(input);
+      assert_eq!(parser.parse_expression(), Err(expected_err));
+    }
+  }
+
+  fn assert_parsed_cases(cases: Vec<(&str, Expr)>) {
+    for (input, expected) in cases {
+      let mut parser = Parser::from_str(input);
+      assert_eq!(parser.parse_expression().unwrap(), expected);
+    }
   }
 }

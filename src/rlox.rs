@@ -1,8 +1,8 @@
-use crate::err::LoxErr;
-use crate::scan::Scanner;
+use crate::err::Result;
+use crate::parse::Parser;
 use std::io::{self, BufRead, Write};
 
-pub fn run(args: Vec<String>) -> Result<(), LoxErr> {
+pub fn run(args: Vec<String>) -> Result<()> {
   if args.len() > 1 {
     eprintln!("Usage: rlox [script]");
     std::process::exit(64);
@@ -14,7 +14,7 @@ pub fn run(args: Vec<String>) -> Result<(), LoxErr> {
   }
 }
 
-pub fn eval_file(path: &str) -> Result<(), LoxErr> {
+pub fn eval_file(path: &str) -> Result<()> {
   let source = std::fs::read_to_string(path)?;
   eval(source)
 }
@@ -24,7 +24,6 @@ pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
   stdout.flush().unwrap();
   for line in stdin.lock().lines() {
     let line = line.unwrap();
-    println!("your line was: {}", line);
     match eval(line) {
       Ok(_) => {}
       Err(err) => err.print(),
@@ -34,10 +33,8 @@ pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
   }
 }
 
-fn eval(source: String) -> Result<(), LoxErr> {
-  let scanner = Scanner::new(&source);
-  for token in scanner {
-    println!("{:?}", token);
-  }
+fn eval(source: String) -> Result<()> {
+  let mut parser = Parser::new(&source);
+  println!("{:#?}", parser.parse());
   Ok(())
 }

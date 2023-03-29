@@ -43,6 +43,51 @@ pub enum Token {
 }
 
 impl Token {
+  pub fn line(&self) -> usize {
+    match self {
+      Token::LeftParen(line) => *line,
+      Token::RightParen(line) => *line,
+      Token::LeftBrace(line) => *line,
+      Token::RightBrace(line) => *line,
+      Token::Comma(line) => *line,
+      Token::Dot(line) => *line,
+      Token::Minus(line) => *line,
+      Token::Plus(line) => *line,
+      Token::Semicolon(line) => *line,
+      Token::Slash(line) => *line,
+      Token::Star(line) => *line,
+      Token::Bang(line) => *line,
+      Token::BangEqual(line) => *line,
+      Token::Equal(line) => *line,
+      Token::EqualEqual(line) => *line,
+      Token::Greater(line) => *line,
+      Token::GreaterEqual(line) => *line,
+      Token::Less(line) => *line,
+      Token::LessEqual(line) => *line,
+      Token::Identifier(line, _) => *line,
+      Token::String(line, _) => *line,
+      Token::Number(line, _) => *line,
+      Token::And(line) => *line,
+      Token::Class(line) => *line,
+      Token::Else(line) => *line,
+      Token::False(line) => *line,
+      Token::Fun(line) => *line,
+      Token::For(line) => *line,
+      Token::If(line) => *line,
+      Token::Nil(line) => *line,
+      Token::Or(line) => *line,
+      Token::Print(line) => *line,
+      Token::Return(line) => *line,
+      Token::Super(line) => *line,
+      Token::This(line) => *line,
+      Token::True(line) => *line,
+      Token::Var(line) => *line,
+      Token::While(line) => *line,
+      Token::Eof(line) => *line,
+      Token::Illegal(line, _) => *line,
+    }
+  }
+
   pub fn lexeme(&self) -> &str {
     match self {
       Token::LeftParen(_) => "(",
