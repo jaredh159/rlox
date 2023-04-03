@@ -1,5 +1,6 @@
-use crate::err::Result;
+use crate::obj::Obj;
 use crate::parse::Parser;
+use crate::{err::Result, eval::Interpreter};
 use std::io::{self, BufRead, Write};
 
 pub fn run(args: Vec<String>) -> Result<()> {
@@ -16,7 +17,7 @@ pub fn run(args: Vec<String>) -> Result<()> {
 
 pub fn eval_file(path: &str) -> Result<()> {
   let source = std::fs::read_to_string(path)?;
-  eval(source)
+  eval(source).map(|obj| println!("{:?}", obj))
 }
 
 pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
@@ -25,7 +26,7 @@ pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
   for line in stdin.lock().lines() {
     let line = line.unwrap();
     match eval(line) {
-      Ok(_) => {}
+      Ok(obj) => obj.print(),
       Err(err) => err.print(),
     }
     print!("> ");
@@ -33,8 +34,9 @@ pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
   }
 }
 
-fn eval(source: String) -> Result<()> {
+fn eval(source: String) -> Result<Obj> {
   let mut parser = Parser::new(&source);
-  println!("{:#?}", parser.parse());
-  Ok(())
+  let mut interpreter = Interpreter;
+  let mut expr = parser.parse()?;
+  interpreter.evaluate(&mut expr)
 }

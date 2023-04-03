@@ -133,6 +133,51 @@ impl Token {
     }
   }
 
+  pub fn get_type(&self) -> TokenType {
+    match self {
+      Token::LeftParen(_) => TokenType::LeftParen,
+      Token::RightParen(_) => TokenType::RightParen,
+      Token::LeftBrace(_) => TokenType::LeftBrace,
+      Token::RightBrace(_) => TokenType::RightBrace,
+      Token::Comma(_) => TokenType::Comma,
+      Token::Dot(_) => TokenType::Dot,
+      Token::Minus(_) => TokenType::Minus,
+      Token::Plus(_) => TokenType::Plus,
+      Token::Semicolon(_) => TokenType::Semicolon,
+      Token::Slash(_) => TokenType::Slash,
+      Token::Star(_) => TokenType::Star,
+      Token::Bang(_) => TokenType::Bang,
+      Token::BangEqual(_) => TokenType::BangEqual,
+      Token::Equal(_) => TokenType::Equal,
+      Token::EqualEqual(_) => TokenType::EqualEqual,
+      Token::Greater(_) => TokenType::Greater,
+      Token::GreaterEqual(_) => TokenType::GreaterEqual,
+      Token::Less(_) => TokenType::Less,
+      Token::LessEqual(_) => TokenType::LessEqual,
+      Token::Identifier(_, _) => TokenType::Identifier,
+      Token::String(_, _) => TokenType::Str,
+      Token::Number(_, _) => TokenType::Number,
+      Token::And(_) => TokenType::And,
+      Token::Class(_) => TokenType::Class,
+      Token::Else(_) => TokenType::Else,
+      Token::False(_) => TokenType::False,
+      Token::Fun(_) => TokenType::Fun,
+      Token::For(_) => TokenType::For,
+      Token::If(_) => TokenType::If,
+      Token::Nil(_) => TokenType::Nil,
+      Token::Or(_) => TokenType::Or,
+      Token::Print(_) => TokenType::Print,
+      Token::Return(_) => TokenType::Return,
+      Token::Super(_) => TokenType::Super,
+      Token::This(_) => TokenType::This,
+      Token::True(_) => TokenType::True,
+      Token::Var(_) => TokenType::Var,
+      Token::While(_) => TokenType::While,
+      Token::Eof(_) => TokenType::Eof,
+      Token::Illegal(_, _) => TokenType::Illegal,
+    }
+  }
+
   pub fn is_type(&self, token_type: TokenType) -> bool {
     match self {
       Token::LeftParen(_) => token_type == TokenType::LeftParen,

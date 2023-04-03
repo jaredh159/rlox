@@ -41,7 +41,7 @@ impl<'a> Parser<'a> {
     while let Some(operator) = self.consume_one_of(op_types) {
       expr = Expr::Binary(Binary {
         left: Box::new(expr),
-        operator,
+        operator: operator.try_into().expect("unexpected non-binary operator"),
         right: Box::new(parse(self)?),
       });
     }
@@ -51,7 +51,7 @@ impl<'a> Parser<'a> {
   fn parse_unary(&mut self) -> Result<Expr> {
     if let Some(operator) = self.consume_one_of(&[Bang, Minus]) {
       Ok(Expr::Unary(Unary {
-        operator,
+        operator: operator.try_into().expect("unexpected non-unary operator"),
         right: Box::new(self.parse_unary()?),
       }))
     } else {
@@ -172,14 +172,14 @@ mod tests {
       (
         "!true",
         Expr::Unary(Unary {
-          operator: Token::Bang(1),
+          operator: UnaryOp::Bang(1),
           right: Box::new(Expr::Literal(Literal::True)),
         }),
       ),
       (
         "-33.33",
         Expr::Unary(Unary {
-          operator: Token::Minus(1),
+          operator: UnaryOp::Minus(1),
           right: Box::new(Expr::Literal(Literal::Number(33.33))),
         }),
       ),
@@ -193,7 +193,7 @@ mod tests {
         "true == true",
         Expr::Binary(Binary {
           left: Box::new(Expr::Literal(Literal::True)),
-          operator: Token::EqualEqual(1),
+          operator: BinaryOp::EqualEqual(1),
           right: Box::new(Expr::Literal(Literal::True)),
         }),
       ),
@@ -201,7 +201,7 @@ mod tests {
         "5 <= 6",
         Expr::Binary(Binary {
           left: Box::new(Expr::Literal(Literal::Number(5.0))),
-          operator: Token::LessEqual(1),
+          operator: BinaryOp::LessEqual(1),
           right: Box::new(Expr::Literal(Literal::Number(6.0))),
         }),
       ),
@@ -222,7 +222,7 @@ mod tests {
         Expr::Grouping(Grouping {
           expr: Box::new(Expr::Binary(Binary {
             left: Box::new(Expr::Literal(Literal::Number(5.0))),
-            operator: Token::LessEqual(1),
+            operator: BinaryOp::LessEqual(1),
             right: Box::new(Expr::Literal(Literal::Number(6.0))),
           })),
         }),

@@ -8,6 +8,7 @@ pub enum LoxErr {
   Io(String),
   Scan { line: usize, message: String },
   Parse { line: usize, message: String },
+  Runtime { line: usize, message: String },
 }
 
 impl LoxErr {
@@ -20,6 +21,7 @@ impl LoxErr {
       LoxErr::Io(_) => std::process::exit(74),
       LoxErr::Scan { .. } => std::process::exit(65),
       LoxErr::Parse { .. } => std::process::exit(65),
+      LoxErr::Runtime { .. } => std::process::exit(65),
     }
   }
 }
@@ -30,6 +32,7 @@ impl Display for LoxErr {
       LoxErr::Io(msg) => write!(f, "IO Error: {}", msg),
       LoxErr::Scan { line, message } => write!(f, "Scan Error: [line {}] {}", line, message),
       LoxErr::Parse { line, message } => write!(f, "Parse Error: [line {}] {}", line, message),
+      LoxErr::Runtime { line, message } => write!(f, "Runtime Error: [line {}] {}", line, message),
     }
   }
 }
