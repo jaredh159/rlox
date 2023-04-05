@@ -1,17 +1,49 @@
 use crate::err::*;
 use crate::expr::*;
 use crate::obj::{Obj::*, *};
+use crate::stmt::Stmt;
 use crate::visit::*;
 
-pub struct Interpreter;
+pub struct Interpreter {
+  last_result: Option<Result<Obj>>,
+}
 
 impl Interpreter {
-  pub fn evaluate(&mut self, expr: &mut Expr) -> Result<Obj> {
-    expr.accept(self)
+  pub fn interpret(&mut self, statements: &mut Vec<Stmt>) -> Result<()> {
+    for statement in statements {
+      statement.accept(self)?;
+    }
+    Ok(())
+  }
+
+  pub fn new() -> Self {
+    Interpreter { last_result: None }
+  }
+
+  fn evaluate(&mut self, expr: &mut Expr) -> Result<Obj> {
+    let result = expr.accept(self);
+    if cfg!(test) {
+      self.last_result = Some(result.clone());
+    }
+    result
   }
 }
 
-impl Visitor for Interpreter {
+impl StmtVisitor for Interpreter {
+  type Result = Result<()>;
+
+  fn visit_expression(&mut self, expr: &mut Expr) -> Self::Result {
+    self.evaluate(expr).map(|_| ())
+  }
+
+  fn visit_print(&mut self, expr: &mut Expr) -> Self::Result {
+    let value = self.evaluate(expr)?;
+    value.print();
+    Ok(())
+  }
+}
+
+impl ExprVisitor for Interpreter {
   type Result = Result<Obj>;
 
   fn visit_binary(&mut self, binary: &mut Binary) -> Self::Result {
@@ -68,6 +100,7 @@ impl Visitor for Interpreter {
       Literal::True => Ok(Bool(true)),
       Literal::False => Ok(Bool(false)),
       Literal::Number(number) => Ok(Num(*number)),
+      Literal::String(string) => Ok(Str(string.to_string())),
     }
   }
 
@@ -102,14 +135,14 @@ mod tests {
   #[test]
   fn test_eval() {
     let cases = vec![
-      ("2 + 2", Obj::Num(4.0)),
-      ("(3 + 5) * 2", Obj::Num(16.0)),
-      ("3 + 5 * 2", Obj::Num(13.0)),
-      ("2 < 2", Obj::Bool(false)),
-      ("2 <= 2", Obj::Bool(true)),
-      ("true == false", Obj::Bool(false)),
-      ("2.5 * 5", Obj::Num(12.5)),
-      ("!nil", Obj::Bool(false)),
+      ("2 + 2;", Obj::Num(4.0)),
+      ("(3 + 5) * 2;", Obj::Num(16.0)),
+      ("3 + 5 * 2;", Obj::Num(13.0)),
+      ("2 < 2;", Obj::Bool(false)),
+      ("2 <= 2;", Obj::Bool(true)),
+      ("true == false;", Obj::Bool(false)),
+      ("2.5 * 5;", Obj::Num(12.5)),
+      ("!nil;", Obj::Bool(false)),
     ];
     for (input, expected) in cases {
       assert_eq!(eval(input), expected);
@@ -118,8 +151,9 @@ mod tests {
 
   fn eval(input: &str) -> Obj {
     let mut parser = Parser::from_str(input);
-    let mut interpreter = Interpreter;
-    let mut expr = parser.parse().unwrap();
-    interpreter.evaluate(&mut expr).unwrap()
+    let mut interpreter = Interpreter::new();
+    let mut stmts = parser.parse().unwrap();
+    interpreter.interpret(&mut stmts).unwrap();
+    interpreter.last_result.unwrap().unwrap()
   }
 }

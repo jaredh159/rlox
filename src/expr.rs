@@ -1,7 +1,7 @@
 use crate::err::LoxErr;
 use crate::tok::{Token, TokenType};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
   Binary(Binary),
   Unary(Unary),
@@ -24,7 +24,7 @@ pub enum BinaryOp {
   EqualEqual(usize),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Binary {
   pub left: Box<Expr>,
   pub operator: BinaryOp,
@@ -37,21 +37,22 @@ pub enum UnaryOp {
   Minus(usize),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Unary {
   pub operator: UnaryOp,
   pub right: Box<Expr>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
   Nil,
   True,
   False,
+  String(String),
   Number(f64),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Grouping {
   pub expr: Box<Expr>,
 }

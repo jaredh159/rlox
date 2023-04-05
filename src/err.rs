@@ -3,7 +3,7 @@ use std::{error::Error, fmt::Display};
 
 pub type Result<T> = std::result::Result<T, LoxErr>;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum LoxErr {
   Io(String),
   Scan { line: usize, message: String },
@@ -21,7 +21,7 @@ impl LoxErr {
       LoxErr::Io(_) => std::process::exit(74),
       LoxErr::Scan { .. } => std::process::exit(65),
       LoxErr::Parse { .. } => std::process::exit(65),
-      LoxErr::Runtime { .. } => std::process::exit(65),
+      LoxErr::Runtime { .. } => std::process::exit(70),
     }
   }
 }

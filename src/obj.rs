@@ -1,6 +1,6 @@
 use colored::*;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Obj {
   Nil,
   Bool(bool),

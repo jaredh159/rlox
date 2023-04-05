@@ -10,6 +10,7 @@ mod parse;
 mod peektwo;
 mod rlox;
 mod scan;
+mod stmt;
 mod tok;
 mod visit;
 

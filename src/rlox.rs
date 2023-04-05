@@ -1,4 +1,3 @@
-use crate::obj::Obj;
 use crate::parse::Parser;
 use crate::{err::Result, eval::Interpreter};
 use std::io::{self, BufRead, Write};
@@ -26,7 +25,7 @@ pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
   for line in stdin.lock().lines() {
     let line = line.unwrap();
     match eval(line) {
-      Ok(obj) => obj.print(),
+      Ok(_) => {}
       Err(err) => err.print(),
     }
     print!("> ");
@@ -34,9 +33,9 @@ pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
   }
 }
 
-fn eval(source: String) -> Result<Obj> {
+fn eval(source: String) -> Result<()> {
   let mut parser = Parser::new(&source);
-  let mut interpreter = Interpreter;
-  let mut expr = parser.parse()?;
-  interpreter.evaluate(&mut expr)
+  let mut interpreter = Interpreter::new();
+  let mut statements = parser.parse()?;
+  interpreter.interpret(&mut statements)
 }

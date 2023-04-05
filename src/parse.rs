@@ -1,6 +1,7 @@
 use crate::err::{LoxErr, Result};
 use crate::expr::*;
 use crate::scan::Scanner;
+use crate::stmt::Stmt;
 use crate::tok::{Token, TokenType, TokenType::*};
 use std::iter::Peekable;
 
@@ -9,8 +10,32 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-  pub fn parse(&mut self) -> Result<Expr> {
-    self.parse_expression()
+  pub fn parse(&mut self) -> Result<Vec<Stmt>> {
+    let mut statements = Vec::new();
+    while !self.is_at_end() {
+      statements.push(self.parse_statement()?);
+    }
+    Ok(statements)
+  }
+
+  fn parse_statement(&mut self) -> Result<Stmt> {
+    if self.consume_discarding(Print) {
+      self.parse_print_stmt()
+    } else {
+      self.parse_expression_stmt()
+    }
+  }
+
+  fn parse_print_stmt(&mut self) -> Result<Stmt> {
+    let expr = self.parse_expression()?;
+    self.consume_expecting(Semicolon, "expected `;` after value")?;
+    Ok(Stmt::Print(expr))
+  }
+
+  fn parse_expression_stmt(&mut self) -> Result<Stmt> {
+    let expr = self.parse_expression()?;
+    self.consume_expecting(Semicolon, "expected `;` after expression")?;
+    Ok(Stmt::Expression(expr))
   }
 
   fn parse_expression(&mut self) -> Result<Expr> {
@@ -66,9 +91,10 @@ impl<'a> Parser<'a> {
       Ok(Expr::Literal(Literal::True))
     } else if self.consume_discarding(Nil) {
       Ok(Expr::Literal(Literal::Nil))
-    } else if let Some(token) = self.consume_if(Number) {
+    } else if let Some(token) = self.consume_one_of(&[Number, Str]) {
       match token {
         Token::Number(_, number) => Ok(Expr::Literal(Literal::Number(number))),
+        Token::String(_, string) => Ok(Expr::Literal(Literal::String(string))),
         _ => panic!("unreachable"),
       }
     } else if self.consume_discarding(LeftParen) {
@@ -159,6 +185,7 @@ mod tests {
   #[test]
   fn test_parse_literal_exprs() {
     assert_parsed_cases(vec![
+      ("\"hi\"", Expr::Literal(Literal::String("hi".to_string()))),
       ("true", Expr::Literal(Literal::True)),
       ("false", Expr::Literal(Literal::False)),
       ("nil", Expr::Literal(Literal::Nil)),
