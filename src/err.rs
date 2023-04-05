@@ -1,3 +1,4 @@
+use colored::Colorize;
 use std::io;
 use std::{error::Error, fmt::Display};
 
@@ -13,7 +14,7 @@ pub enum LoxErr {
 
 impl LoxErr {
   pub fn print(&self) {
-    eprintln!("{}", self);
+    eprintln!("{}", self.to_string().red());
   }
 
   pub fn exit(self) -> ! {

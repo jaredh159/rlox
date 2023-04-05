@@ -1,5 +1,6 @@
 use crate::parse::Parser;
 use crate::{err::Result, eval::Interpreter};
+use colored::Colorize;
 use std::io::{self, BufRead, Write};
 
 pub fn run(args: Vec<String>) -> Result<()> {
@@ -20,7 +21,7 @@ pub fn eval_file(path: &str) -> Result<()> {
 }
 
 pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
-  print!("> ");
+  print!("{} ", ">".to_string().bright_cyan());
   stdout.flush().unwrap();
   for line in stdin.lock().lines() {
     let line = line.unwrap();
@@ -28,7 +29,7 @@ pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
       Ok(_) => {}
       Err(err) => err.print(),
     }
-    print!("> ");
+    print!("{} ", ">".to_string().bright_cyan());
     stdout.flush().unwrap();
   }
 }
