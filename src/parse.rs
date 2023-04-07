@@ -12,10 +12,43 @@ pub struct Parser<'a> {
 impl<'a> Parser<'a> {
   pub fn parse(&mut self) -> Result<Vec<Stmt>> {
     let mut statements = Vec::new();
+    let mut errors = Vec::new();
     while !self.is_at_end() {
-      statements.push(self.parse_statement()?);
+      match self.parse_declaration() {
+        Ok(stmt) => statements.push(stmt),
+        Err(err) => {
+          errors.push(err);
+          self.synchronize_after_error();
+        }
+      }
     }
-    Ok(statements)
+    if errors.is_empty() {
+      Ok(statements)
+    } else if errors.len() == 1 {
+      Err(errors.pop().unwrap())
+    } else {
+      Err(LoxErr::Many(
+        errors.into_iter().map(Box::new).collect::<Vec<_>>(),
+      ))
+    }
+  }
+
+  fn parse_declaration(&mut self) -> Result<Stmt> {
+    if self.consume_discarding(Var) {
+      self.parse_variable_declaration()
+    } else {
+      self.parse_statement()
+    }
+  }
+
+  fn parse_variable_declaration(&mut self) -> Result<Stmt> {
+    let name = self.consume_expecting(Identifier, "expected a variable name")?;
+    let initializer = match self.consume_discarding(Equal) {
+      true => Some(self.parse_expression()?),
+      false => None,
+    };
+    self.consume_expecting(Semicolon, "expected `;` after variable declaration")?;
+    Ok(Stmt::Var { name, initializer })
   }
 
   fn parse_statement(&mut self) -> Result<Stmt> {
@@ -84,6 +117,10 @@ impl<'a> Parser<'a> {
     }
   }
 
+  // 👍 todo:
+  // then, implement environment, empty visit stmt fns in Interpreter
+  // also, rework/extend test in eval.rs
+
   fn parse_primary(&mut self) -> Result<Expr> {
     if self.consume_discarding(False) {
       Ok(Expr::Literal(Literal::False))
@@ -91,6 +128,8 @@ impl<'a> Parser<'a> {
       Ok(Expr::Literal(Literal::True))
     } else if self.consume_discarding(Nil) {
       Ok(Expr::Literal(Literal::Nil))
+    } else if let Some(token) = self.consume_if(Identifier) {
+      Ok(Expr::Variable(token))
     } else if let Some(token) = self.consume_one_of(&[Number, Str]) {
       match token {
         Token::Number(_, number) => Ok(Expr::Literal(Literal::Number(number))),
@@ -106,10 +145,16 @@ impl<'a> Parser<'a> {
     }
   }
 
-  // https://craftinginterpreters.com/parsing-expressions.html
-  // search `private void synchronize`
-  fn synchronize_after_err(&mut self) {
-    todo!()
+  fn synchronize_after_error(&mut self) {
+    while !self.is_at_end() {
+      if self.consume_discarding(Semicolon) {
+        return;
+      } else if self.peek_one_of(&[Class, Fun, Var, For, If, While, Print, Return]) {
+        return;
+      } else {
+        self.tokens.next();
+      }
+    }
   }
 
   fn consume_expecting(
@@ -129,12 +174,11 @@ impl<'a> Parser<'a> {
   }
 
   fn consume_one_of(&mut self, token_types: &[TokenType]) -> Option<Token> {
-    for token_type in token_types {
-      if self.peek_is(token_type) {
-        return self.tokens.next();
-      }
+    if self.peek_one_of(token_types) {
+      self.tokens.next()
+    } else {
+      None
     }
-    None
   }
 
   fn consume_if(&mut self, token_type: TokenType) -> Option<Token> {
@@ -147,6 +191,15 @@ impl<'a> Parser<'a> {
   fn peek_is(&mut self, token_type: &TokenType) -> bool {
     let peeked = self.tokens.peek();
     !peeked.is_none() && peeked.unwrap().is_type(*token_type)
+  }
+
+  fn peek_one_of(&mut self, token_types: &[TokenType]) -> bool {
+    for token_type in token_types {
+      if self.peek_is(token_type) {
+        return true;
+      }
+    }
+    false
   }
 
   fn is_at_end(&mut self) -> bool {
@@ -184,7 +237,7 @@ mod tests {
 
   #[test]
   fn test_parse_literal_exprs() {
-    assert_parsed_cases(vec![
+    assert_parsed_expressions(vec![
       ("\"hi\"", Expr::Literal(Literal::String("hi".to_string()))),
       ("true", Expr::Literal(Literal::True)),
       ("false", Expr::Literal(Literal::False)),
@@ -195,7 +248,7 @@ mod tests {
 
   #[test]
   fn test_parse_unary_exprs() {
-    assert_parsed_cases(vec![
+    assert_parsed_expressions(vec![
       (
         "!true",
         Expr::Unary(Unary {
@@ -215,7 +268,7 @@ mod tests {
 
   #[test]
   fn test_parse_binary_exprs() {
-    assert_parsed_cases(vec![
+    assert_parsed_expressions(vec![
       (
         "true == true",
         Expr::Binary(Binary {
@@ -237,7 +290,7 @@ mod tests {
 
   #[test]
   fn test_parse_grouped_exprs() {
-    assert_parsed_cases(vec![
+    assert_parsed_expressions(vec![
       (
         "(true)",
         Expr::Grouping(Grouping {
@@ -274,17 +327,59 @@ mod tests {
           message: "expected an expression".to_string(),
         },
       ),
+      (
+        "(true; *;",
+        LoxErr::Many(vec![
+          Box::new(LoxErr::Parse {
+            line: 1,
+            message: "expected `)` after expression".to_string(),
+          }),
+          Box::new(LoxErr::Parse {
+            line: 1,
+            message: "expected an expression".to_string(),
+          }),
+        ]),
+      ),
     ];
     for (input, expected_err) in cases {
       let mut parser = Parser::from_str(input);
-      assert_eq!(parser.parse_expression(), Err(expected_err));
+      assert_eq!(parser.parse(), Err(expected_err));
     }
   }
 
-  fn assert_parsed_cases(cases: Vec<(&str, Expr)>) {
+  #[test]
+  fn test_parse_variable_decls() {
+    assert_parsed_statements(vec![
+      (
+        "var x;",
+        Stmt::Var {
+          name: Token::Identifier(1, "x".to_string()),
+          initializer: None,
+        },
+      ),
+      (
+        "var foobar = 33;",
+        Stmt::Var {
+          name: Token::Identifier(1, "foobar".to_string()),
+          initializer: Some(Expr::Literal(Literal::Number(33.0))),
+        },
+      ),
+    ])
+  }
+
+  fn assert_parsed_expressions(cases: Vec<(&str, Expr)>) {
     for (input, expected) in cases {
       let mut parser = Parser::from_str(input);
       assert_eq!(parser.parse_expression().unwrap(), expected);
+    }
+  }
+
+  fn assert_parsed_statements(cases: Vec<(&str, Stmt)>) {
+    for (input, expected) in cases {
+      let mut parser = Parser::from_str(input);
+      let program = parser.parse().unwrap();
+      assert_eq!(program.len(), 1);
+      assert_eq!(program[0], expected);
     }
   }
 }

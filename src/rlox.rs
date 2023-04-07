@@ -25,18 +25,17 @@ pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
   stdout.flush().unwrap();
   for line in stdin.lock().lines() {
     let line = line.unwrap();
-    match eval(line) {
-      Ok(_) => {}
-      Err(err) => err.print(),
-    }
+    _ = eval(line);
     print!("{} ", ">".to_string().bright_cyan());
     stdout.flush().unwrap();
   }
 }
 
 fn eval(source: String) -> Result<()> {
-  let mut parser = Parser::new(&source);
+  let mut program = Parser::new(&source).parse()?;
   let mut interpreter = Interpreter::new();
-  let mut statements = parser.parse()?;
-  interpreter.interpret(&mut statements)
+  interpreter.interpret(&mut program).map_err(|err| {
+    err.print();
+    err
+  })
 }

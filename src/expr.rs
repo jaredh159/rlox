@@ -7,6 +7,7 @@ pub enum Expr {
   Unary(Unary),
   Literal(Literal),
   Grouping(Grouping),
+  Variable(Token),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]

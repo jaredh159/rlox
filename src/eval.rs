@@ -2,6 +2,7 @@ use crate::err::*;
 use crate::expr::*;
 use crate::obj::{Obj::*, *};
 use crate::stmt::Stmt;
+use crate::tok::Token;
 use crate::visit::*;
 
 pub struct Interpreter {
@@ -111,6 +112,10 @@ impl ExprVisitor for Interpreter {
       (UnaryOp::Minus(_), Num(number)) => Ok(Num(-number)),
       (UnaryOp::Minus(line), _) => Err(runtime(line, "operand for unary `-` must be number")),
     }
+  }
+
+  fn visit_variable(&mut self, variable: &mut Token) -> Self::Result {
+    todo!()
   }
 }
 
