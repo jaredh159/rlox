@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
-use std::env;
-
+mod env;
 mod err;
 mod eval;
 mod expr;
@@ -15,7 +14,7 @@ mod tok;
 mod visit;
 
 fn main() {
-  let args = env::args().skip(1).collect::<Vec<_>>();
+  let args = std::env::args().skip(1).collect::<Vec<_>>();
   if let Err(err) = rlox::run(args) {
     err.print();
     err.exit();

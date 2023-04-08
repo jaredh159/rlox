@@ -1,3 +1,4 @@
+use crate::env::Env;
 use crate::err::*;
 use crate::expr::*;
 use crate::obj::{Obj::*, *};
@@ -6,6 +7,7 @@ use crate::tok::Token;
 use crate::visit::*;
 
 pub struct Interpreter {
+  env: Env,
   last_result: Option<Result<Obj>>,
 }
 
@@ -18,7 +20,10 @@ impl Interpreter {
   }
 
   pub fn new() -> Self {
-    Interpreter { last_result: None }
+    Interpreter {
+      env: Env::new(),
+      last_result: None,
+    }
   }
 
   fn evaluate(&mut self, expr: &mut Expr) -> Result<Obj> {
@@ -40,6 +45,12 @@ impl StmtVisitor for Interpreter {
   fn visit_print(&mut self, expr: &mut Expr) -> Self::Result {
     let value = self.evaluate(expr)?;
     value.print();
+    Ok(())
+  }
+
+  fn visit_var(&mut self, name: &Token, initializer: Option<&mut Expr>) -> Self::Result {
+    let value = initializer.map_or(Ok(Obj::Nil), |expr| self.evaluate(expr))?;
+    self.env.define(name.lexeme().to_string(), value);
     Ok(())
   }
 }
@@ -115,7 +126,7 @@ impl ExprVisitor for Interpreter {
   }
 
   fn visit_variable(&mut self, variable: &mut Token) -> Self::Result {
-    todo!()
+    self.env.get(variable)
   }
 }
 
@@ -140,25 +151,49 @@ mod tests {
   #[test]
   fn test_eval() {
     let cases = vec![
-      ("2 + 2;", Obj::Num(4.0)),
-      ("(3 + 5) * 2;", Obj::Num(16.0)),
-      ("3 + 5 * 2;", Obj::Num(13.0)),
-      ("2 < 2;", Obj::Bool(false)),
-      ("2 <= 2;", Obj::Bool(true)),
-      ("true == false;", Obj::Bool(false)),
-      ("2.5 * 5;", Obj::Num(12.5)),
-      ("!nil;", Obj::Bool(false)),
+      ("2 + 2", Obj::Num(4.0)),
+      ("(3 + 5) * 2", Obj::Num(16.0)),
+      ("3 + 5 * 2", Obj::Num(13.0)),
+      ("2 < 2", Obj::Bool(false)),
+      ("2 <= 2", Obj::Bool(true)),
+      ("true == false", Obj::Bool(false)),
+      ("2.5 * 5", Obj::Num(12.5)),
+      ("!nil", Obj::Bool(false)),
     ];
     for (input, expected) in cases {
-      assert_eq!(eval(input), expected);
+      assert_eq!(eval(input).unwrap(), expected);
     }
   }
 
-  fn eval(input: &str) -> Obj {
+  #[test]
+  fn test_interpret() {
+    let cases = vec![
+      ("var x = 2; x + 2;", Obj::Num(4.0)),
+      ("var a = 1; var b = 2; a + b;", Obj::Num(3.0)),
+    ];
+    for (input, expected) in cases {
+      assert_eq!(interpret(input).unwrap(), expected);
+    }
+  }
+
+  fn eval(input: &str) -> Result<Obj> {
+    let stmt = input.to_string() + ";";
+    let mut parser = Parser::new(&stmt);
+    let mut interpreter = Interpreter::new();
+    let mut stmts = parser.parse().unwrap();
+    assert_eq!(stmts.len(), 1);
+    let mut expr = match stmts.pop().unwrap() {
+      Stmt::Expression(expr) => expr,
+      _ => panic!("expected expression statement"),
+    };
+    interpreter.evaluate(&mut expr)
+  }
+
+  fn interpret(input: &str) -> Result<Obj> {
     let mut parser = Parser::from_str(input);
     let mut interpreter = Interpreter::new();
     let mut stmts = parser.parse().unwrap();
-    interpreter.interpret(&mut stmts).unwrap();
-    interpreter.last_result.unwrap().unwrap()
+    interpreter.interpret(&mut stmts)?;
+    interpreter.last_result.unwrap()
   }
 }

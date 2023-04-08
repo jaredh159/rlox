@@ -13,6 +13,7 @@ pub trait StmtVisitor {
   type Result;
   fn visit_expression(&mut self, expr: &mut Expr) -> Self::Result;
   fn visit_print(&mut self, expr: &mut Expr) -> Self::Result;
+  fn visit_var(&mut self, name: &Token, initializer: Option<&mut Expr>) -> Self::Result;
 }
 
 pub trait ExprVisitable {
@@ -30,7 +31,7 @@ impl ExprVisitable for Expr {
       Expr::Unary(unary) => visitor.visit_unary(unary),
       Expr::Literal(literal) => visitor.visit_literal(literal),
       Expr::Grouping(grouping) => visitor.visit_grouping(grouping),
-      Expr::Variable(_) => todo!(),
+      Expr::Variable(token) => visitor.visit_variable(token),
     }
   }
 }
@@ -40,7 +41,7 @@ impl StmtVisitable for Stmt {
     match self {
       Stmt::Expression(expr) => visitor.visit_expression(expr),
       Stmt::Print(expr) => visitor.visit_print(expr),
-      Stmt::Var { name, initializer } => todo!(),
+      Stmt::Var { name, initializer } => visitor.visit_var(name, initializer.as_mut()),
     }
   }
 }
