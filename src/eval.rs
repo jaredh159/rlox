@@ -102,6 +102,12 @@ impl ExprVisitor for Interpreter {
     }
   }
 
+  fn visit_assign(&mut self, assign: &mut Assign) -> Self::Result {
+    let value = self.evaluate(&mut *assign.value)?;
+    self.env.assign(&assign.name, value.clone())?;
+    Ok(value)
+  }
+
   fn visit_grouping(&mut self, grouping: &mut Grouping) -> Self::Result {
     self.evaluate(&mut *grouping.expr)
   }
@@ -169,10 +175,34 @@ mod tests {
   fn test_interpret() {
     let cases = vec![
       ("var x = 2; x + 2;", Obj::Num(4.0)),
+      ("var x = 2; x = 3; x + 2;", Obj::Num(5.0)),
       ("var a = 1; var b = 2; a + b;", Obj::Num(3.0)),
     ];
     for (input, expected) in cases {
       assert_eq!(interpret(input).unwrap(), expected);
+    }
+  }
+
+  #[test]
+  fn test_interpret_errors() {
+    let cases = vec![
+      (
+        "print 2 + x;",
+        Err(LoxErr::Runtime {
+          line: 1,
+          message: "undefined variable `x`".to_string(),
+        }),
+      ),
+      (
+        "x = 2; var x;",
+        Err(LoxErr::Runtime {
+          line: 1,
+          message: "undefined variable `x`".to_string(),
+        }),
+      ),
+    ];
+    for (input, expected) in cases {
+      assert_eq!(interpret(input), expected);
     }
   }
 

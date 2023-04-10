@@ -2,6 +2,7 @@ use crate::{expr::*, stmt::Stmt, tok::Token};
 
 pub trait ExprVisitor {
   type Result;
+  fn visit_assign(&mut self, assign: &mut Assign) -> Self::Result;
   fn visit_binary(&mut self, binary: &mut Binary) -> Self::Result;
   fn visit_grouping(&mut self, grouping: &mut Grouping) -> Self::Result;
   fn visit_literal(&mut self, literal: &mut Literal) -> Self::Result;
@@ -32,6 +33,7 @@ impl ExprVisitable for Expr {
       Expr::Literal(literal) => visitor.visit_literal(literal),
       Expr::Grouping(grouping) => visitor.visit_grouping(grouping),
       Expr::Variable(token) => visitor.visit_variable(token),
+      Expr::Assign(assign) => visitor.visit_assign(assign),
     }
   }
 }

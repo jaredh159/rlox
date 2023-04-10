@@ -8,6 +8,7 @@ pub enum Expr {
   Literal(Literal),
   Grouping(Grouping),
   Variable(Token),
+  Assign(Assign),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -23,6 +24,12 @@ pub enum BinaryOp {
   Less(usize),
   LessEqual(usize),
   EqualEqual(usize),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Assign {
+  pub name: Token,
+  pub value: Box<Expr>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

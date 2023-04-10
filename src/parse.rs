@@ -72,7 +72,26 @@ impl<'a> Parser<'a> {
   }
 
   fn parse_expression(&mut self) -> Result<Expr> {
-    self.parse_equality()
+    self.parse_assignment()
+  }
+
+  fn parse_assignment(&mut self) -> Result<Expr> {
+    let expr = self.parse_equality()?;
+    if let Some(equals) = self.consume_if(Equal) {
+      let value = self.parse_assignment()?;
+      match expr {
+        Expr::Variable(token) => Ok(Expr::Assign(Assign {
+          name: token,
+          value: Box::new(value),
+        })),
+        _ => Err(LoxErr::Parse {
+          line: equals.line(),
+          message: "invalid assignment target".to_string(),
+        }),
+      }
+    } else {
+      Ok(expr)
+    }
   }
 
   fn parse_equality(&mut self) -> Result<Expr> {
@@ -289,6 +308,30 @@ mod tests {
   }
 
   #[test]
+  fn test_parse_assignment() {
+    assert_parsed_expressions(vec![
+      (
+        "x = true",
+        Expr::Assign(Assign {
+          name: Token::Identifier(1, "x".to_string()),
+          value: Box::new(Expr::Literal(Literal::True)),
+        }),
+      ),
+      (
+        "foobar = 33 + 1.3",
+        Expr::Assign(Assign {
+          name: Token::Identifier(1, "foobar".to_string()),
+          value: Box::new(Expr::Binary(Binary {
+            left: Box::new(Expr::Literal(Literal::Number(33.0))),
+            operator: BinaryOp::Plus(1),
+            right: Box::new(Expr::Literal(Literal::Number(1.3))),
+          })),
+        }),
+      ),
+    ]);
+  }
+
+  #[test]
   fn test_parse_grouped_exprs() {
     assert_parsed_expressions(vec![
       (
@@ -325,6 +368,20 @@ mod tests {
         LoxErr::Parse {
           line: 1,
           message: "expected an expression".to_string(),
+        },
+      ),
+      (
+        "a + b = c",
+        LoxErr::Parse {
+          line: 1,
+          message: "invalid assignment target".to_string(),
+        },
+      ),
+      (
+        "(a) = 2",
+        LoxErr::Parse {
+          line: 1,
+          message: "invalid assignment target".to_string(),
         },
       ),
       (
