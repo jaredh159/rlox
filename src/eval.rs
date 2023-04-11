@@ -5,9 +5,11 @@ use crate::obj::{Obj::*, *};
 use crate::stmt::Stmt;
 use crate::tok::Token;
 use crate::visit::*;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub struct Interpreter {
-  env: Env,
+  env: Rc<RefCell<Env>>,
   last_result: Option<Result<Obj>>,
 }
 
@@ -19,9 +21,18 @@ impl Interpreter {
     Ok(())
   }
 
+  pub fn interpret_block(&mut self, statements: &mut Vec<Stmt>) -> Result<()> {
+    let mut block = self.scope();
+    let result = block.interpret(statements);
+    if cfg!(test) {
+      self.last_result = block.last_result;
+    }
+    result
+  }
+
   pub fn new() -> Self {
     Interpreter {
-      env: Env::new(),
+      env: Rc::new(RefCell::new(Env::new())),
       last_result: None,
     }
   }
@@ -32,6 +43,13 @@ impl Interpreter {
       self.last_result = Some(result.clone());
     }
     result
+  }
+
+  fn scope(&mut self) -> Self {
+    Interpreter {
+      env: Rc::new(RefCell::new(Env::new_enclosing(Rc::clone(&self.env)))),
+      last_result: None,
+    }
   }
 }
 
@@ -50,8 +68,15 @@ impl StmtVisitor for Interpreter {
 
   fn visit_var(&mut self, name: &Token, initializer: Option<&mut Expr>) -> Self::Result {
     let value = initializer.map_or(Ok(Obj::Nil), |expr| self.evaluate(expr))?;
-    self.env.define(name.lexeme().to_string(), value);
+    self
+      .env
+      .borrow_mut()
+      .define(name.lexeme().to_string(), value);
     Ok(())
+  }
+
+  fn visit_block(&mut self, stmts: &mut Vec<Stmt>) -> Self::Result {
+    self.interpret_block(stmts)
   }
 }
 
@@ -104,7 +129,7 @@ impl ExprVisitor for Interpreter {
 
   fn visit_assign(&mut self, assign: &mut Assign) -> Self::Result {
     let value = self.evaluate(&mut *assign.value)?;
-    self.env.assign(&assign.name, value.clone())?;
+    self.env.borrow_mut().assign(&assign.name, value.clone())?;
     Ok(value)
   }
 
@@ -132,7 +157,7 @@ impl ExprVisitor for Interpreter {
   }
 
   fn visit_variable(&mut self, variable: &mut Token) -> Self::Result {
-    self.env.get(variable)
+    self.env.borrow_mut().get(variable)
   }
 }
 
@@ -177,6 +202,8 @@ mod tests {
       ("var x = 2; x + 2;", Obj::Num(4.0)),
       ("var x = 2; x = 3; x + 2;", Obj::Num(5.0)),
       ("var a = 1; var b = 2; a + b;", Obj::Num(3.0)),
+      ("var a = 1; { var b = 3; a = b * 2; } a + 1;", Obj::Num(7.0)),
+      ("var a = 1; { var a = 3; } a + 1;", Obj::Num(2.0)),
     ];
     for (input, expected) in cases {
       assert_eq!(interpret(input).unwrap(), expected);

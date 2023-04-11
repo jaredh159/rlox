@@ -54,9 +54,20 @@ impl<'a> Parser<'a> {
   fn parse_statement(&mut self) -> Result<Stmt> {
     if self.consume_discarding(Print) {
       self.parse_print_stmt()
+    } else if self.consume_discarding(LeftBrace) {
+      Ok(Stmt::Block(self.parse_block()?))
     } else {
       self.parse_expression_stmt()
     }
+  }
+
+  fn parse_block(&mut self) -> Result<Vec<Stmt>> {
+    let mut stmts = Vec::new();
+    while !self.peek_is(&RightBrace) && !self.is_at_end() {
+      stmts.push(self.parse_declaration()?);
+    }
+    self.consume_expecting(RightBrace, "expected `}` after block")?;
+    Ok(stmts)
   }
 
   fn parse_print_stmt(&mut self) -> Result<Stmt> {
@@ -422,6 +433,20 @@ mod tests {
         },
       ),
     ])
+  }
+
+  #[test]
+  fn test_parse_blocks() {
+    assert_parsed_statements(vec![
+      (
+        "{ var x; }",
+        Stmt::Block(vec![Stmt::Var {
+          name: Token::Identifier(1, "x".to_string()),
+          initializer: None,
+        }]),
+      ),
+      ("{}", Stmt::Block(vec![])),
+    ]);
   }
 
   fn assert_parsed_expressions(cases: Vec<(&str, Expr)>) {
