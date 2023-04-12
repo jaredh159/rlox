@@ -2,6 +2,7 @@ use crate::env::Env;
 use crate::err::*;
 use crate::expr::*;
 use crate::obj::{Obj::*, *};
+use crate::stmt::IfStmt;
 use crate::stmt::Stmt;
 use crate::tok::Token;
 use crate::visit::*;
@@ -77,6 +78,16 @@ impl StmtVisitor for Interpreter {
 
   fn visit_block(&mut self, stmts: &mut Vec<Stmt>) -> Self::Result {
     self.interpret_block(stmts)
+  }
+
+  fn visit_if(&mut self, if_stmt: &mut IfStmt) -> Self::Result {
+    if if_stmt.condition.accept(self)?.is_truthy() {
+      if_stmt.then_branch.accept(self)
+    } else if let Some(mut else_branch) = if_stmt.else_branch.take() {
+      else_branch.accept(self)
+    } else {
+      Ok(())
+    }
   }
 }
 
