@@ -105,7 +105,7 @@ impl<'a> Parser<'a> {
   }
 
   fn parse_assignment(&mut self) -> Result<Expr> {
-    let expr = self.parse_equality()?;
+    let expr = self.parse_or()?;
     if let Some(equals) = self.consume_if(Equal) {
       let value = self.parse_assignment()?;
       match expr {
@@ -121,6 +121,32 @@ impl<'a> Parser<'a> {
     } else {
       Ok(expr)
     }
+  }
+
+  fn parse_or(&mut self) -> Result<Expr> {
+    self.parse_logical(Or, Parser::parse_and)
+  }
+
+  fn parse_and(&mut self) -> Result<Expr> {
+    self.parse_logical(And, Parser::parse_equality)
+  }
+
+  fn parse_logical<F>(&mut self, token_type: TokenType, parse: F) -> Result<Expr>
+  where
+    F: Fn(&mut Parser<'a>) -> Result<Expr>,
+  {
+    let mut expr = parse(self)?;
+    while let Some(operator) = self.consume_if(token_type) {
+      let right = parse(self)?;
+      expr = Expr::Logical(Logical {
+        left: Box::new(expr),
+        operator: operator
+          .try_into()
+          .expect("unexpected non-logical operator"),
+        right: Box::new(right),
+      });
+    }
+    Ok(expr)
   }
 
   fn parse_equality(&mut self) -> Result<Expr> {
@@ -164,10 +190,6 @@ impl<'a> Parser<'a> {
       self.parse_primary()
     }
   }
-
-  // 👍 todo:
-  // then, implement environment, empty visit stmt fns in Interpreter
-  // also, rework/extend test in eval.rs
 
   fn parse_primary(&mut self) -> Result<Expr> {
     if self.consume_discarding(False) {
@@ -355,6 +377,22 @@ mod tests {
             operator: BinaryOp::Plus(1),
             right: Box::new(Expr::Literal(Literal::Number(1.3))),
           })),
+        }),
+      ),
+      (
+        "x or true",
+        Expr::Logical(Logical {
+          left: Box::new(Expr::Variable(Token::Identifier(1, "x".to_string()))),
+          operator: LogicalOp::Or(1),
+          right: Box::new(Expr::Literal(Literal::True)),
+        }),
+      ),
+      (
+        "true and false",
+        Expr::Logical(Logical {
+          left: Box::new(Expr::Literal(Literal::True)),
+          operator: LogicalOp::And(1),
+          right: Box::new(Expr::Literal(Literal::False)),
         }),
       ),
     ]);

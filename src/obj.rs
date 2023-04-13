@@ -12,7 +12,7 @@ impl Obj {
   pub fn is_truthy(&self) -> bool {
     match self {
       Obj::Nil => false,
-      Obj::Bool(boolean) => !boolean,
+      Obj::Bool(boolean) => *boolean,
       _ => true,
     }
   }

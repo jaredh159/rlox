@@ -170,6 +170,15 @@ impl ExprVisitor for Interpreter {
   fn visit_variable(&mut self, variable: &mut Token) -> Self::Result {
     self.env.borrow_mut().get(variable)
   }
+
+  fn visit_logical(&mut self, logical: &mut Logical) -> Self::Result {
+    let left = self.evaluate(&mut logical.left)?;
+    match (logical.operator, left.is_truthy()) {
+      (LogicalOp::Or(_), true) => Ok(left),
+      (LogicalOp::And(_), false) => Ok(left),
+      _ => self.evaluate(&mut logical.right),
+    }
+  }
 }
 
 fn runtime<S>(line: &usize, message: S) -> LoxErr
@@ -201,6 +210,12 @@ mod tests {
       ("true == false", Obj::Bool(false)),
       ("2.5 * 5", Obj::Num(12.5)),
       ("!nil", Obj::Bool(false)),
+      ("\"hi\" or 2", Obj::Str("hi".to_string())),
+      ("nil or \"yes\"", Obj::Str("yes".to_string())),
+      ("nil or false", Obj::Bool(false)),
+      ("true and true", Obj::Bool(true)),
+      ("true and false", Obj::Bool(false)),
+      ("false and true", Obj::Bool(false)),
     ];
     for (input, expected) in cases {
       assert_eq!(eval(input).unwrap(), expected);

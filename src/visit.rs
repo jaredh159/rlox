@@ -7,6 +7,7 @@ pub trait ExprVisitor {
   fn visit_binary(&mut self, binary: &mut Binary) -> Self::Result;
   fn visit_grouping(&mut self, grouping: &mut Grouping) -> Self::Result;
   fn visit_literal(&mut self, literal: &mut Literal) -> Self::Result;
+  fn visit_logical(&mut self, logical: &mut Logical) -> Self::Result;
   fn visit_unary(&mut self, unary: &mut Unary) -> Self::Result;
   fn visit_variable(&mut self, variable: &mut Token) -> Self::Result;
 }
@@ -37,6 +38,7 @@ impl ExprVisitable for Expr {
       Expr::Grouping(grouping) => visitor.visit_grouping(grouping),
       Expr::Variable(token) => visitor.visit_variable(token),
       Expr::Assign(assign) => visitor.visit_assign(assign),
+      Expr::Logical(logical) => visitor.visit_logical(logical),
     }
   }
 }

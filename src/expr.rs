@@ -6,24 +6,10 @@ pub enum Expr {
   Binary(Binary),
   Unary(Unary),
   Literal(Literal),
+  Logical(Logical),
   Grouping(Grouping),
   Variable(Token),
   Assign(Assign),
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub enum BinaryOp {
-  Minus(usize),
-  Star(usize),
-  Slash(usize),
-  Plus(usize),
-  Bang(usize),
-  BangEqual(usize),
-  Greater(usize),
-  GreaterEqual(usize),
-  Less(usize),
-  LessEqual(usize),
-  EqualEqual(usize),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -39,10 +25,11 @@ pub struct Binary {
   pub right: Box<Expr>,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub enum UnaryOp {
-  Bang(usize),
-  Minus(usize),
+#[derive(Debug, PartialEq, Clone)]
+pub struct Logical {
+  pub left: Box<Expr>,
+  pub operator: LogicalOp,
+  pub right: Box<Expr>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -63,6 +50,33 @@ pub enum Literal {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Grouping {
   pub expr: Box<Expr>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum LogicalOp {
+  And(usize),
+  Or(usize),
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum UnaryOp {
+  Bang(usize),
+  Minus(usize),
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum BinaryOp {
+  Minus(usize),
+  Star(usize),
+  Slash(usize),
+  Plus(usize),
+  Bang(usize),
+  BangEqual(usize),
+  Greater(usize),
+  GreaterEqual(usize),
+  Less(usize),
+  LessEqual(usize),
+  EqualEqual(usize),
 }
 
 impl BinaryOp {
@@ -115,6 +129,22 @@ impl UnaryOp {
   }
 }
 
+impl LogicalOp {
+  pub fn lexeme(&self) -> &'static str {
+    match self {
+      LogicalOp::And(_) => "and",
+      LogicalOp::Or(_) => "or",
+    }
+  }
+
+  pub fn line(&self) -> &usize {
+    match self {
+      LogicalOp::And(line) => line,
+      LogicalOp::Or(line) => line,
+    }
+  }
+}
+
 impl TryFrom<Token> for BinaryOp {
   type Error = LoxErr;
   fn try_from(token: Token) -> Result<Self, Self::Error> {
@@ -147,6 +177,20 @@ impl TryFrom<Token> for UnaryOp {
       _ => Err(LoxErr::Parse {
         line: token.line(),
         message: format!("invalid token `{}` for unary operator", token.lexeme()),
+      }),
+    }
+  }
+}
+
+impl TryFrom<Token> for LogicalOp {
+  type Error = LoxErr;
+  fn try_from(token: Token) -> Result<Self, Self::Error> {
+    match token.get_type() {
+      TokenType::And => Ok(LogicalOp::And(token.line())),
+      TokenType::Or => Ok(LogicalOp::Or(token.line())),
+      _ => Err(LoxErr::Parse {
+        line: token.line(),
+        message: format!("invalid token `{}` for logical operator", token.lexeme()),
       }),
     }
   }
