@@ -54,6 +54,8 @@ impl<'a> Parser<'a> {
   fn parse_statement(&mut self) -> Result<Stmt> {
     if self.consume_discarding(Print) {
       self.parse_print_stmt()
+    } else if self.consume_discarding(For) {
+      self.parse_for_stmt()
     } else if self.consume_discarding(If) {
       self.parse_if_stmt()
     } else if self.consume_discarding(While) {
@@ -86,6 +88,44 @@ impl<'a> Parser<'a> {
     self.consume_expecting(RightParen, "expected `)` after `condition`")?;
     let body = Box::new(self.parse_statement()?);
     Ok(Stmt::While(WhileStmt { condition, body }))
+  }
+
+  fn parse_for_stmt(&mut self) -> Result<Stmt> {
+    self.consume_expecting(LeftParen, "expected `(` after `for`")?;
+    let initializer = match self.consume_one_of(&[Semicolon, Var]) {
+      Some(Token::Semicolon(_)) => None,
+      Some(Token::Var(_)) => Some(self.parse_variable_declaration()?),
+      _ => Some(self.parse_expression_stmt()?),
+    };
+
+    let condition = match self.peek_is(&Semicolon) {
+      true => None,
+      false => Some(self.parse_expression()?),
+    };
+    self.consume_expecting(Semicolon, "expected `;` after loop condition")?;
+
+    let increment = match self.peek_is(&RightParen) {
+      true => None,
+      false => Some(self.parse_expression()?),
+    };
+    self.consume_expecting(RightParen, "expected `)` after for clauses")?;
+
+    let mut body = self.parse_statement()?;
+    if let Some(increment) = increment {
+      body = Stmt::Block(vec![body, Stmt::Expression(increment)])
+    }
+
+    if let Some(condition) = condition {
+      body = Stmt::While(WhileStmt {
+        condition,
+        body: Box::new(body),
+      })
+    }
+
+    if let Some(initializer) = initializer {
+      body = Stmt::Block(vec![initializer, body]);
+    }
+    Ok(body)
   }
 
   fn parse_if_stmt(&mut self) -> Result<Stmt> {
@@ -568,6 +608,34 @@ mod tests {
           body: Box::new(Stmt::Block(vec![])),
         }),
       ),
+      (
+        // test for loops de-sugar to while loops
+        "for (var i = 0; i < 10; i = i + 1) print i;",
+        Stmt::Block(vec![
+          Stmt::Var {
+            name: Token::Identifier(1, "i".to_string()),
+            initializer: Some(Expr::Literal(Literal::Number(0.0))),
+          },
+          Stmt::While(WhileStmt {
+            condition: Expr::Binary(Binary {
+              left: Box::new(Expr::Variable(Token::Identifier(1, "i".to_string()))),
+              operator: BinaryOp::Less(1),
+              right: Box::new(Expr::Literal(Literal::Number(10.0))),
+            }),
+            body: Box::new(Stmt::Block(vec![
+              Stmt::Print(Expr::Variable(Token::Identifier(1, "i".to_string()))),
+              Stmt::Expression(Expr::Assign(Assign {
+                name: Token::Identifier(1, "i".to_string()),
+                value: Box::new(Expr::Binary(Binary {
+                  left: Box::new(Expr::Variable(Token::Identifier(1, "i".to_string()))),
+                  operator: BinaryOp::Plus(1),
+                  right: Box::new(Expr::Literal(Literal::Number(1.0))),
+                })),
+              })),
+            ])),
+          }),
+        ]),
+      ),
     ]);
   }
 
@@ -584,6 +652,14 @@ mod tests {
       let program = parser.parse().unwrap();
       assert_eq!(program.len(), 1);
       assert_eq!(program[0], expected);
+    }
+  }
+
+  fn assert_parsed_programs(cases: Vec<(&str, Vec<Stmt>)>) {
+    for (input, expected) in cases {
+      let mut parser = Parser::from_str(input);
+      let program = parser.parse().unwrap();
+      assert_eq!(program, expected);
     }
   }
 }
