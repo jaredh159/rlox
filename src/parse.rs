@@ -56,6 +56,8 @@ impl<'a> Parser<'a> {
       self.parse_print_stmt()
     } else if self.consume_discarding(If) {
       self.parse_if_stmt()
+    } else if self.consume_discarding(While) {
+      self.parse_while_stmt()
     } else if self.consume_discarding(LeftBrace) {
       Ok(Stmt::Block(self.parse_block()?))
     } else {
@@ -78,10 +80,18 @@ impl<'a> Parser<'a> {
     Ok(Stmt::Print(expr))
   }
 
+  fn parse_while_stmt(&mut self) -> Result<Stmt> {
+    self.consume_expecting(LeftParen, "expected `(` after `while`")?;
+    let condition = self.parse_expression()?;
+    self.consume_expecting(RightParen, "expected `)` after `condition`")?;
+    let body = Box::new(self.parse_statement()?);
+    Ok(Stmt::While(WhileStmt { condition, body }))
+  }
+
   fn parse_if_stmt(&mut self) -> Result<Stmt> {
     self.consume_expecting(LeftParen, "expected `(` after `if`")?;
     let condition = self.parse_expression()?;
-    self.consume_expecting(RightParen, "expected `)` after `if`")?;
+    self.consume_expecting(RightParen, "expected `)` after `condition`")?;
     let then_branch = Box::new(self.parse_statement()?);
     let else_branch = match self.consume_discarding(Else) {
       true => Some(Box::new(self.parse_statement()?)),
@@ -379,6 +389,12 @@ mod tests {
           })),
         }),
       ),
+    ]);
+  }
+
+  #[test]
+  fn test_parse_logical() {
+    assert_parsed_expressions(vec![
       (
         "x or true",
         Expr::Logical(Logical {
@@ -528,6 +544,28 @@ mod tests {
           else_branch: Some(Box::new(Stmt::Block(vec![Stmt::Expression(
             Expr::Literal(Literal::Nil),
           )]))),
+        }),
+      ),
+    ]);
+  }
+
+  #[test]
+  fn test_parse_while_stmts() {
+    assert_parsed_statements(vec![
+      (
+        "while (x) { 3; }",
+        Stmt::While(WhileStmt {
+          condition: Expr::Variable(Token::Identifier(1, "x".to_string())),
+          body: Box::new(Stmt::Block(vec![Stmt::Expression(Expr::Literal(
+            Literal::Number(3.0),
+          ))])),
+        }),
+      ),
+      (
+        "while (true) {}",
+        Stmt::While(WhileStmt {
+          condition: Expr::Literal(Literal::True),
+          body: Box::new(Stmt::Block(vec![])),
         }),
       ),
     ]);

@@ -10,6 +10,7 @@ pub enum Stmt {
     name: Token,
     initializer: Option<Expr>,
   },
+  While(WhileStmt),
 }
 
 #[derive(Debug, PartialEq)]
@@ -17,4 +18,10 @@ pub struct IfStmt {
   pub condition: Expr,
   pub then_branch: Box<Stmt>,
   pub else_branch: Option<Box<Stmt>>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct WhileStmt {
+  pub condition: Expr,
+  pub body: Box<Stmt>,
 }

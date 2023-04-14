@@ -1,4 +1,4 @@
-use crate::stmt::{IfStmt, Stmt};
+use crate::stmt::*;
 use crate::{expr::*, tok::Token};
 
 pub trait ExprVisitor {
@@ -19,6 +19,7 @@ pub trait StmtVisitor {
   fn visit_var(&mut self, name: &Token, initializer: Option<&mut Expr>) -> Self::Result;
   fn visit_block(&mut self, stmts: &mut Vec<Stmt>) -> Self::Result;
   fn visit_if(&mut self, if_stmt: &mut IfStmt) -> Self::Result;
+  fn visit_while(&mut self, while_stmt: &mut WhileStmt) -> Self::Result;
 }
 
 pub trait ExprVisitable {
@@ -51,6 +52,7 @@ impl StmtVisitable for Stmt {
       Stmt::Var { name, initializer } => visitor.visit_var(name, initializer.as_mut()),
       Stmt::Block(stmts) => visitor.visit_block(stmts),
       Stmt::If(if_stmt) => visitor.visit_if(if_stmt),
+      Stmt::While(while_stmt) => visitor.visit_while(while_stmt),
     }
   }
 }

@@ -2,8 +2,8 @@ use crate::env::Env;
 use crate::err::*;
 use crate::expr::*;
 use crate::obj::{Obj::*, *};
-use crate::stmt::IfStmt;
 use crate::stmt::Stmt;
+use crate::stmt::{IfStmt, WhileStmt};
 use crate::tok::Token;
 use crate::visit::*;
 use std::cell::RefCell;
@@ -88,6 +88,13 @@ impl StmtVisitor for Interpreter {
     } else {
       Ok(())
     }
+  }
+
+  fn visit_while(&mut self, while_stmt: &mut WhileStmt) -> Self::Result {
+    while self.evaluate(&mut while_stmt.condition)?.is_truthy() {
+      while_stmt.body.accept(self)?;
+    }
+    Ok(())
   }
 }
 
@@ -230,6 +237,10 @@ mod tests {
       ("var a = 1; var b = 2; a + b;", Obj::Num(3.0)),
       ("var a = 1; { var b = 3; a = b * 2; } a + 1;", Obj::Num(7.0)),
       ("var a = 1; { var a = 3; } a + 1;", Obj::Num(2.0)),
+      (
+        "var a = 1; while (a < 10) { a = a + 1; } a;",
+        Obj::Num(10.0),
+      ),
     ];
     for (input, expected) in cases {
       assert_eq!(interpret(input).unwrap(), expected);
