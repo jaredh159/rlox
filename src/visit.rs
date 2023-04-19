@@ -10,6 +10,7 @@ pub trait ExprVisitor {
   fn visit_logical(&mut self, logical: &mut Logical) -> Self::Result;
   fn visit_unary(&mut self, unary: &mut Unary) -> Self::Result;
   fn visit_variable(&mut self, variable: &mut Token) -> Self::Result;
+  fn visit_call(&mut self, call: &mut Call) -> Self::Result;
 }
 
 pub trait StmtVisitor {
@@ -40,6 +41,7 @@ impl ExprVisitable for Expr {
       Expr::Variable(token) => visitor.visit_variable(token),
       Expr::Assign(assign) => visitor.visit_assign(assign),
       Expr::Logical(logical) => visitor.visit_logical(logical),
+      Expr::Call(call) => visitor.visit_call(call),
     }
   }
 }

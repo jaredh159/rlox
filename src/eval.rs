@@ -11,6 +11,7 @@ use std::rc::Rc;
 
 pub struct Interpreter {
   env: Rc<RefCell<Env>>,
+  globals: Rc<Env>,
   last_result: Option<Result<Obj>>,
 }
 
@@ -34,6 +35,7 @@ impl Interpreter {
   pub fn new() -> Self {
     Interpreter {
       env: Rc::new(RefCell::new(Env::new())),
+      globals: Rc::new(Env::new()),
       last_result: None,
     }
   }
@@ -49,6 +51,7 @@ impl Interpreter {
   fn scope(&mut self) -> Self {
     Interpreter {
       env: Rc::new(RefCell::new(Env::new_enclosing(Rc::clone(&self.env)))),
+      globals: Rc::clone(&self.globals),
       last_result: None,
     }
   }
@@ -184,6 +187,34 @@ impl ExprVisitor for Interpreter {
       (LogicalOp::Or(_), true) => Ok(left),
       (LogicalOp::And(_), false) => Ok(left),
       _ => self.evaluate(&mut logical.right),
+    }
+  }
+
+  fn visit_call(&mut self, call: &mut Call) -> Self::Result {
+    let callee = self.evaluate(&mut *call.callee)?;
+    let mut args = Vec::new();
+    for mut arg in &mut call.args {
+      args.push(self.evaluate(&mut arg)?);
+    }
+    match callee.callable() {
+      None => Err(runtime(
+        &call.paren.line(),
+        "can only call functions and classes",
+      )),
+      Some(callable) => {
+        if args.len() != callable.arity() {
+          Err(runtime(
+            &call.paren.line(),
+            format!(
+              "expected {} arguments but got {}",
+              callable.arity(),
+              args.len()
+            ),
+          ))
+        } else {
+          callable.call(args)
+        }
+      }
     }
   }
 }

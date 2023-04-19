@@ -237,8 +237,39 @@ impl<'a> Parser<'a> {
         right: Box::new(self.parse_unary()?),
       }))
     } else {
-      self.parse_primary()
+      self.parse_call()
     }
+  }
+
+  fn parse_call(&mut self) -> Result<Expr> {
+    let mut expr = self.parse_primary()?;
+    // bob says loop will make sense when we handle properties on objects...
+    loop {
+      if self.consume_discarding(LeftParen) {
+        expr = self.finish_call(expr)?;
+      } else {
+        break;
+      }
+    }
+    Ok(expr)
+  }
+
+  fn finish_call(&mut self, callee: Expr) -> Result<Expr> {
+    let mut args = Vec::new();
+    if !self.peek_is(&RightParen) {
+      loop {
+        args.push(self.parse_expression()?);
+        if !self.consume_discarding(Comma) {
+          break;
+        }
+      }
+    }
+    let paren = self.consume_expecting(RightParen, "expected `)` after arguments")?;
+    Ok(Expr::Call(Call {
+      callee: Box::new(callee),
+      paren,
+      args,
+    }))
   }
 
   fn parse_primary(&mut self) -> Result<Expr> {
@@ -449,6 +480,40 @@ mod tests {
           left: Box::new(Expr::Literal(Literal::True)),
           operator: LogicalOp::And(1),
           right: Box::new(Expr::Literal(Literal::False)),
+        }),
+      ),
+    ]);
+  }
+
+  #[test]
+  fn test_parse_call_exprs() {
+    assert_parsed_expressions(vec![
+      (
+        "foo()",
+        Expr::Call(Call {
+          callee: Box::new(Expr::Variable(Token::Identifier(1, "foo".to_string()))),
+          paren: Token::RightParen(1),
+          args: vec![],
+        }),
+      ),
+      (
+        "foo(true)",
+        Expr::Call(Call {
+          callee: Box::new(Expr::Variable(Token::Identifier(1, "foo".to_string()))),
+          paren: Token::RightParen(1),
+          args: vec![Expr::Literal(Literal::True)],
+        }),
+      ),
+      (
+        "foo(1,2,3)",
+        Expr::Call(Call {
+          callee: Box::new(Expr::Variable(Token::Identifier(1, "foo".to_string()))),
+          paren: Token::RightParen(1),
+          args: vec![
+            Expr::Literal(Literal::Number(1.0)),
+            Expr::Literal(Literal::Number(2.0)),
+            Expr::Literal(Literal::Number(3.0)),
+          ],
         }),
       ),
     ]);

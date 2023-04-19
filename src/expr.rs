@@ -4,6 +4,7 @@ use crate::tok::{Token, TokenType};
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
   Binary(Binary),
+  Call(Call),
   Unary(Unary),
   Literal(Literal),
   Logical(Logical),
@@ -23,6 +24,13 @@ pub struct Binary {
   pub left: Box<Expr>,
   pub operator: BinaryOp,
   pub right: Box<Expr>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Call {
+  pub callee: Box<Expr>,
+  pub paren: Token,
+  pub args: Vec<Expr>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
