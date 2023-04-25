@@ -1,7 +1,12 @@
+use crate::env::Env;
 use crate::err::Result;
+use crate::eval::Interpreter;
+use crate::stmt::FnStmt;
 use colored::*;
+use std::cell::RefCell;
 use std::fmt::Debug;
 use std::fmt::Display;
+use std::rc::Rc;
 use std::time;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -11,6 +16,33 @@ pub enum Obj {
   Num(f64),
   Str(String),
   NativeFunc(NativeFunc),
+  Func(Func),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Func {
+  pub decl: FnStmt,
+}
+
+impl Callable for Func {
+  fn call(&mut self, interpreter: &mut Interpreter, args: Vec<Obj>) -> Result<Obj> {
+    let mut env = Env::new_enclosing(Rc::clone(&interpreter.env));
+    for (arg, param) in args.into_iter().zip(&self.decl.params) {
+      env.define(param.lexeme().to_string(), arg);
+    }
+    interpreter.interpret_block(&mut self.decl.body, Some(Rc::new(RefCell::new(env))))?;
+    Ok(interpreter.return_value.take().unwrap_or(Obj::Nil))
+  }
+
+  fn arity(&self) -> usize {
+    self.decl.params.len()
+  }
+}
+
+impl Display for Func {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "<fun: {}>", self.decl.name.lexeme())
+  }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -27,7 +59,7 @@ impl Display for NativeFunc {
 }
 
 impl Callable for NativeFunc {
-  fn call(&self, _: Vec<Obj>) -> Result<Obj> {
+  fn call(&mut self, _: &mut Interpreter, _: Vec<Obj>) -> Result<Obj> {
     match self {
       NativeFunc::Clock => {
         let duration_since_epoch = time::SystemTime::now()
@@ -56,9 +88,10 @@ impl Obj {
     }
   }
 
-  pub fn callable(&self) -> Option<Box<&dyn Callable>> {
+  pub fn callable(&mut self) -> Option<Box<dyn Callable>> {
     match self {
-      Obj::NativeFunc(func) => Some(Box::new(func)),
+      Obj::NativeFunc(func) => Some(Box::new(func.clone())),
+      Obj::Func(func) => Some(Box::new(func.clone())),
       _ => None,
     }
   }
@@ -70,11 +103,12 @@ impl Obj {
       Obj::Num(number) => println!("{}", number.to_string().magenta()),
       Obj::Str(string) => println!("\"{}\"", string.cyan()),
       Obj::NativeFunc(func) => println!("{}", format!("{func}").dimmed()),
+      Obj::Func(func) => println!("{}", format!("{func}").dimmed()),
     }
   }
 }
 
 pub trait Callable {
-  fn call(&self, args: Vec<Obj>) -> Result<Obj>;
+  fn call(&mut self, interpreter: &mut Interpreter, args: Vec<Obj>) -> Result<Obj>;
   fn arity(&self) -> usize;
 }

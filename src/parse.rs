@@ -34,11 +34,37 @@ impl<'a> Parser<'a> {
   }
 
   fn parse_declaration(&mut self) -> Result<Stmt> {
-    if self.consume_discarding(Var) {
+    if self.consume_discarding(Fun) {
+      self.parse_fn_declaration(FnKind::Function)
+    } else if self.consume_discarding(Var) {
       self.parse_variable_declaration()
     } else {
       self.parse_statement()
     }
+  }
+
+  fn parse_fn_declaration(&mut self, kind: FnKind) -> Result<Stmt> {
+    let name = self.consume_expecting(Identifier, kind.ident_error())?;
+    self.consume_expecting(LeftParen, kind.lparen_error())?;
+    let mut params = Vec::new();
+    if !self.peek_is(&RightParen) {
+      loop {
+        if params.len() >= 255 {
+          return Err(LoxErr::Parse {
+            line: self.tokens.peek().unwrap_or(&name).line(),
+            message: "can't have more than 255 parameters".to_string(),
+          });
+        }
+        params.push(self.consume_expecting(Identifier, "expected parameter name")?);
+        if !self.consume_discarding(Comma) {
+          break;
+        }
+      }
+    }
+    self.consume_expecting(RightParen, "expected `)` after parameters")?;
+    self.consume_expecting(LeftBrace, kind.lbrace_error())?;
+    let body = self.parse_block()?;
+    Ok(Stmt::Function(FnStmt { name, params, body }))
   }
 
   fn parse_variable_declaration(&mut self) -> Result<Stmt> {
@@ -54,6 +80,8 @@ impl<'a> Parser<'a> {
   fn parse_statement(&mut self) -> Result<Stmt> {
     if self.consume_discarding(Print) {
       self.parse_print_stmt()
+    } else if let Some(keyword) = self.consume_if(Return) {
+      self.parse_return_stmt(keyword)
     } else if self.consume_discarding(For) {
       self.parse_for_stmt()
     } else if self.consume_discarding(If) {
@@ -80,6 +108,15 @@ impl<'a> Parser<'a> {
     let expr = self.parse_expression()?;
     self.consume_expecting(Semicolon, "expected `;` after value")?;
     Ok(Stmt::Print(expr))
+  }
+
+  fn parse_return_stmt(&mut self, keyword: Token) -> Result<Stmt> {
+    let value = match self.peek_is(&Semicolon) {
+      false => Some(self.parse_expression()?),
+      true => None,
+    };
+    self.consume_expecting(Semicolon, "expected `;` after return value")?;
+    Ok(Stmt::Return { keyword, value })
   }
 
   fn parse_while_stmt(&mut self) -> Result<Stmt> {
@@ -380,6 +417,33 @@ impl<'a> Parser<'a> {
   }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum FnKind {
+  Function,
+  Method,
+}
+
+impl FnKind {
+  fn ident_error(&self) -> &'static str {
+    match self {
+      FnKind::Function => "expected function name",
+      FnKind::Method => "expected method name",
+    }
+  }
+  fn lparen_error(&self) -> &'static str {
+    match self {
+      FnKind::Function => "expected `(` after function name",
+      FnKind::Method => "expected `(` after method name",
+    }
+  }
+  fn lbrace_error(&self) -> &'static str {
+    match self {
+      FnKind::Function => "expected `{` before function body",
+      FnKind::Method => "expected `{` before method body",
+    }
+  }
+}
+
 // tests
 
 #[cfg(test)]
@@ -608,6 +672,43 @@ mod tests {
           name: Token::Identifier(1, "foobar".to_string()),
           initializer: Some(Expr::Literal(Literal::Number(33.0))),
         },
+      ),
+    ])
+  }
+
+  #[test]
+  fn test_parse_fn_decls() {
+    assert_parsed_statements(vec![
+      (
+        "fun ident(x) { return x; }",
+        Stmt::Function(FnStmt {
+          name: Token::Identifier(1, "ident".to_string()),
+          params: vec![Token::Identifier(1, "x".to_string())],
+          body: vec![Stmt::Return {
+            keyword: Token::Return(1),
+            value: Some(Expr::Variable(Token::Identifier(1, "x".to_string()))),
+          }],
+        }),
+      ),
+      (
+        "fun foo() { nil; }",
+        Stmt::Function(FnStmt {
+          name: Token::Identifier(1, "foo".to_string()),
+          params: vec![],
+          body: vec![Stmt::Expression(Expr::Literal(Literal::Nil))],
+        }),
+      ),
+      (
+        "fun foo(a,b,c) { true; }",
+        Stmt::Function(FnStmt {
+          name: Token::Identifier(1, "foo".to_string()),
+          params: vec![
+            Token::Identifier(1, "a".to_string()),
+            Token::Identifier(1, "b".to_string()),
+            Token::Identifier(1, "c".to_string()),
+          ],
+          body: vec![Stmt::Expression(Expr::Literal(Literal::True))],
+        }),
       ),
     ])
   }

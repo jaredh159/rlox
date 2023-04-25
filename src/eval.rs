@@ -1,7 +1,8 @@
 use crate::env::Env;
 use crate::err::*;
 use crate::expr::*;
-use crate::obj::{Obj::*, *};
+use crate::obj::{Func, Obj::*, *};
+use crate::stmt::FnStmt;
 use crate::stmt::Stmt;
 use crate::stmt::{IfStmt, WhileStmt};
 use crate::tok::Token;
@@ -10,22 +11,32 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 pub struct Interpreter {
-  env: Rc<RefCell<Env>>,
-  globals: Rc<Env>,
+  pub env: Rc<RefCell<Env>>,
+  pub return_value: Option<Obj>,
   last_result: Option<Result<Obj>>,
 }
 
 impl Interpreter {
   pub fn interpret(&mut self, statements: &mut Vec<Stmt>) -> Result<()> {
     for statement in statements {
+      if self.return_value != None {
+        return Ok(());
+      }
       statement.accept(self)?;
     }
     Ok(())
   }
 
-  pub fn interpret_block(&mut self, statements: &mut Vec<Stmt>) -> Result<()> {
-    let mut block = self.scope();
+  pub fn interpret_block(
+    &mut self,
+    statements: &mut Vec<Stmt>,
+    env: Option<Rc<RefCell<Env>>>,
+  ) -> Result<()> {
+    let mut block = self.scope(env);
     let result = block.interpret(statements);
+    if let Some(return_value) = block.return_value.take() {
+      self.return_value = Some(return_value);
+    }
     if cfg!(test) {
       self.last_result = block.last_result;
     }
@@ -33,9 +44,13 @@ impl Interpreter {
   }
 
   pub fn new() -> Self {
+    Interpreter::new_with_env(Rc::new(RefCell::new(Env::new())))
+  }
+
+  pub fn new_with_env(env: Rc<RefCell<Env>>) -> Self {
     Interpreter {
-      env: Rc::new(RefCell::new(Env::new())),
-      globals: Rc::new(Env::new()),
+      env,
+      return_value: None,
       last_result: None,
     }
   }
@@ -48,12 +63,12 @@ impl Interpreter {
     result
   }
 
-  fn scope(&mut self) -> Self {
-    Interpreter {
-      env: Rc::new(RefCell::new(Env::new_enclosing(Rc::clone(&self.env)))),
-      globals: Rc::clone(&self.globals),
-      last_result: None,
-    }
+  fn scope(&mut self, env: Option<Rc<RefCell<Env>>>) -> Self {
+    Interpreter::new_with_env(
+      env.unwrap_or(Rc::new(RefCell::new(Env::new_enclosing(Rc::clone(
+        &self.env,
+      ))))),
+    )
   }
 }
 
@@ -80,7 +95,7 @@ impl StmtVisitor for Interpreter {
   }
 
   fn visit_block(&mut self, stmts: &mut Vec<Stmt>) -> Self::Result {
-    self.interpret_block(stmts)
+    self.interpret_block(stmts, None)
   }
 
   fn visit_if(&mut self, if_stmt: &mut IfStmt) -> Self::Result {
@@ -94,9 +109,25 @@ impl StmtVisitor for Interpreter {
   }
 
   fn visit_while(&mut self, while_stmt: &mut WhileStmt) -> Self::Result {
-    while self.evaluate(&mut while_stmt.condition)?.is_truthy() {
+    while self.return_value == None && self.evaluate(&mut while_stmt.condition)?.is_truthy() {
       while_stmt.body.accept(self)?;
     }
+    Ok(())
+  }
+
+  fn visit_fn(&mut self, fn_stmt: &mut FnStmt) -> Self::Result {
+    self.env.borrow_mut().define(
+      fn_stmt.name.lexeme().to_string(),
+      Obj::Func(Func {
+        decl: fn_stmt.clone(),
+      }),
+    );
+    Ok(())
+  }
+
+  fn visit_return(&mut self, _keyword: &Token, value: Option<&mut Expr>) -> Self::Result {
+    let value = value.map_or(Ok(Obj::Nil), |expr| self.evaluate(expr))?;
+    self.return_value = Some(value);
     Ok(())
   }
 }
@@ -191,7 +222,7 @@ impl ExprVisitor for Interpreter {
   }
 
   fn visit_call(&mut self, call: &mut Call) -> Self::Result {
-    let callee = self.evaluate(&mut *call.callee)?;
+    let mut callee = self.evaluate(&mut *call.callee)?;
     let mut args = Vec::new();
     for mut arg in &mut call.args {
       args.push(self.evaluate(&mut arg)?);
@@ -201,7 +232,7 @@ impl ExprVisitor for Interpreter {
         &call.paren.line(),
         "can only call functions and classes",
       )),
-      Some(callable) => {
+      Some(mut callable) => {
         if args.len() != callable.arity() {
           Err(runtime(
             &call.paren.line(),
@@ -212,7 +243,7 @@ impl ExprVisitor for Interpreter {
             ),
           ))
         } else {
-          callable.call(args)
+          callable.call(self, args)
         }
       }
     }
@@ -261,6 +292,82 @@ mod tests {
   }
 
   #[test]
+  fn test_return_unwind() {
+    let cases = vec![
+      (
+        r"
+      fun fib(n) {
+        if (n <= 1) return n;
+        return fib(n - 2) + fib(n - 1);
+      }
+
+      fib(15);
+      ",
+        Obj::Num(610.0),
+      ),
+      (
+        r"
+      fun foobar(n) {
+        if (n < 6) {
+          return 2;
+        } else {
+          return 3;
+        }
+      }
+
+      foobar(1) + foobar(10);
+      ",
+        Obj::Num(5.0),
+      ),
+      (
+        r"
+      fun foobar(n) {
+        return 7;
+        if (n < 6) {
+          return 2;
+        }
+      }
+
+      foobar(1);
+      ",
+        Obj::Num(7.0),
+      ),
+      (
+        r"
+      fun foobar(n) {
+        {
+          {
+            {
+              return n + 5;
+            }
+          }
+        }
+      }
+
+      foobar(1);
+      ",
+        Obj::Num(6.0),
+      ),
+      (
+        r"
+      fun count(n) {
+        while (n < 100) {
+          if (n == 3) return n;
+          n = n + 1;
+        }
+      }
+
+      count(1);
+      ",
+        Obj::Num(3.0),
+      ),
+    ];
+    for (input, expected) in cases {
+      assert_eq!(interpret(input).unwrap(), expected);
+    }
+  }
+
+  #[test]
   fn test_interpret() {
     let cases = vec![
       ("var x = 2; x + 2;", Obj::Num(4.0)),
@@ -271,6 +378,12 @@ mod tests {
       (
         "var a = 1; while (a < 10) { a = a + 1; } a;",
         Obj::Num(10.0),
+      ),
+      ("fun add(x) { return x + 1; } add(3);", Obj::Num(4.0)),
+      ("fun six() { return 6; } six();", Obj::Num(6.0)),
+      (
+        "fun sum(x, y, z) { return x + y + z; } sum(1, 2, 3);",
+        Obj::Num(6.0),
       ),
     ];
     for (input, expected) in cases {
