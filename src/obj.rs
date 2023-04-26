@@ -22,11 +22,12 @@ pub enum Obj {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Func {
   pub decl: FnStmt,
+  pub closure: Rc<RefCell<Env>>,
 }
 
 impl Callable for Func {
   fn call(&mut self, interpreter: &mut Interpreter, args: Vec<Obj>) -> Result<Obj> {
-    let mut env = Env::new_enclosing(Rc::clone(&interpreter.env));
+    let mut env = Env::new_enclosing(Rc::clone(&self.closure));
     for (arg, param) in args.into_iter().zip(&self.decl.params) {
       env.define(param.lexeme().to_string(), arg);
     }

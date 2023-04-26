@@ -120,6 +120,7 @@ impl StmtVisitor for Interpreter {
       fn_stmt.name.lexeme().to_string(),
       Obj::Func(Func {
         decl: fn_stmt.clone(),
+        closure: Rc::clone(&self.env),
       }),
     );
     Ok(())
@@ -292,8 +293,26 @@ mod tests {
   }
 
   #[test]
-  fn test_return_unwind() {
+  fn test_return_unwind_and_closures() {
     let cases = vec![
+      (
+        r"
+      fun makeCounter() {
+        var i = 0;
+        fun count() {
+          i = i + 1;
+          return i;
+        }
+
+        return count;
+      }
+
+      var counter = makeCounter();
+      counter(); // 1
+      counter(); // 2
+      ",
+        Obj::Num(2.0),
+      ),
       (
         r"
       fun fib(n) {

@@ -1,19 +1,27 @@
 use crate::err::{LoxErr, Result};
 use crate::obj::{NativeFunc, Obj};
 use crate::tok::Token;
-use phf::phf_map;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-static GLOBALS: phf::Map<&'static str, Obj> = phf_map! {
-  "clock" => Obj::NativeFunc(NativeFunc::Clock)
-};
+fn resolve_global(name: &str) -> Option<Obj> {
+  match name {
+    "clock" => Some(Obj::NativeFunc(NativeFunc::Clock)),
+    _ => None,
+  }
+}
 
 #[derive(Debug)]
 pub struct Env {
   pub enclosing: Option<Rc<RefCell<Env>>>,
   pub values: HashMap<String, Obj>,
+}
+
+impl PartialEq for Env {
+  fn eq(&self, other: &Self) -> bool {
+    std::ptr::eq(self, other)
+  }
 }
 
 impl Env {
@@ -27,7 +35,7 @@ impl Env {
       None => {
         if let Some(enclosing) = &self.enclosing {
           enclosing.borrow_mut().get(name)
-        } else if let Some(native_func) = GLOBALS.get(name.lexeme()) {
+        } else if let Some(native_func) = resolve_global(name.lexeme()) {
           Ok(native_func.clone())
         } else {
           Err(LoxErr::Runtime {
