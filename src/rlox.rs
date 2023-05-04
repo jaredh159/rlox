@@ -1,5 +1,6 @@
 use crate::env::Env;
 use crate::parse::Parser;
+use crate::resolver::resolve;
 use crate::{err::Result, eval::Interpreter};
 use colored::Colorize;
 use std::cell::RefCell;
@@ -20,7 +21,8 @@ pub fn run(args: Vec<String>) -> Result<()> {
 
 pub fn eval_file(path: &str) -> Result<()> {
   let source = std::fs::read_to_string(path)?;
-  eval(source, None).map(|obj| println!("{:?}", obj))
+  let globals = Rc::new(RefCell::new(Env::new()));
+  eval(source, globals, None).map(|obj| println!("{:?}", obj))
 }
 
 pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
@@ -29,16 +31,21 @@ pub fn start_repl(stdin: io::Stdin, mut stdout: io::Stdout) {
   let env = Rc::new(RefCell::new(Env::new()));
   for line in stdin.lock().lines() {
     let line = line.unwrap();
-    _ = eval(line, Some(Rc::clone(&env)));
+    _ = eval(line, Rc::clone(&env), Some(Rc::clone(&env)));
     print!("{} ", ">".to_string().bright_cyan());
     stdout.flush().unwrap();
   }
 }
 
-fn eval(source: String, env: Option<Rc<RefCell<Env>>>) -> Result<()> {
+fn eval(
+  source: String,
+  globals: Rc<RefCell<Env>>,
+  enclosing: Option<Rc<RefCell<Env>>>,
+) -> Result<()> {
   let mut program = Parser::new(&source).parse()?;
-  let env = env.unwrap_or(Rc::new(RefCell::new(Env::new())));
-  let mut interpreter = Interpreter::new_with_env(env);
+  let enclosing = enclosing.unwrap_or(Rc::clone(&globals));
+  let mut interpreter = Interpreter::new_with_env(enclosing, globals);
+  resolve(&mut program)?;
   interpreter.interpret(&mut program).map_err(|err| {
     err.print();
     err

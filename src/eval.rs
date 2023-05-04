@@ -2,9 +2,8 @@ use crate::env::Env;
 use crate::err::*;
 use crate::expr::*;
 use crate::obj::{Func, Obj::*, *};
-use crate::stmt::FnStmt;
-use crate::stmt::Stmt;
-use crate::stmt::{IfStmt, WhileStmt};
+use crate::resolver::Resolvable;
+use crate::stmt::{FnStmt, IfStmt, Stmt, WhileStmt};
 use crate::tok::Token;
 use crate::visit::*;
 use std::cell::RefCell;
@@ -12,6 +11,7 @@ use std::rc::Rc;
 
 pub struct Interpreter {
   pub env: Rc<RefCell<Env>>,
+  pub globals: Rc<RefCell<Env>>,
   pub return_value: Option<Obj>,
   last_result: Option<Result<Obj>>,
 }
@@ -44,15 +44,25 @@ impl Interpreter {
   }
 
   pub fn new() -> Self {
-    Interpreter::new_with_env(Rc::new(RefCell::new(Env::new())))
+    let globals = Rc::new(RefCell::new(Env::new()));
+    return Interpreter::new_with_env(Rc::clone(&globals), globals);
   }
 
-  pub fn new_with_env(env: Rc<RefCell<Env>>) -> Self {
+  pub fn new_with_env(env: Rc<RefCell<Env>>, globals: Rc<RefCell<Env>>) -> Self {
     Interpreter {
       env,
+      globals,
       return_value: None,
       last_result: None,
     }
+  }
+
+  fn lookup_variable(&self, variable: &mut impl Resolvable) -> Result<Obj> {
+    variable
+      .get_distance()
+      .map_or(self.globals.borrow_mut().get(variable.name()), |distance| {
+        self.env.borrow_mut().get_at(distance, variable.name())
+      })
   }
 
   fn evaluate(&mut self, expr: &mut Expr) -> Result<Obj> {
@@ -68,6 +78,7 @@ impl Interpreter {
       env.unwrap_or(Rc::new(RefCell::new(Env::new_enclosing(Rc::clone(
         &self.env,
       ))))),
+      Rc::clone(&self.globals),
     )
   }
 }
@@ -182,7 +193,18 @@ impl ExprVisitor for Interpreter {
 
   fn visit_assign(&mut self, assign: &mut Assign) -> Self::Result {
     let value = self.evaluate(&mut *assign.value)?;
-    self.env.borrow_mut().assign(&assign.name, value.clone())?;
+    assign.distance.map_or(
+      self
+        .globals
+        .borrow_mut()
+        .assign(assign.name(), value.clone()),
+      |distance| {
+        self
+          .env
+          .borrow_mut()
+          .assign_at(distance, assign.name(), value.clone())
+      },
+    )?;
     Ok(value)
   }
 
@@ -209,8 +231,8 @@ impl ExprVisitor for Interpreter {
     }
   }
 
-  fn visit_variable(&mut self, variable: &mut Token) -> Self::Result {
-    self.env.borrow_mut().get(variable)
+  fn visit_variable(&mut self, variable: &mut Variable) -> Self::Result {
+    self.lookup_variable(variable)
   }
 
   fn visit_logical(&mut self, logical: &mut Logical) -> Self::Result {
@@ -265,7 +287,7 @@ where
 
 #[cfg(test)]
 mod tests {
-  use crate::parse::Parser;
+  use crate::{parse::Parser, resolver::resolve};
 
   use super::*;
 
@@ -290,6 +312,24 @@ mod tests {
     for (input, expected) in cases {
       assert_eq!(eval(input).unwrap(), expected);
     }
+  }
+
+  #[test]
+  fn test_weird_scope_issue() {
+    let input = r#"
+      var a = 7;
+      {
+        fun returnA() {
+          return a;
+        }
+
+        var b = returnA();
+        var a = 0;
+        var c = returnA();
+        b + c; // should be 14
+      }
+      "#;
+    assert_eq!(interpret(input).unwrap(), Obj::Num(14.0));
   }
 
   #[test]
@@ -427,6 +467,27 @@ mod tests {
           message: "undefined variable `x`".to_string(),
         }),
       ),
+      (
+        "{ var a = a; }",
+        Err(LoxErr::Resolve {
+          line: 1,
+          message: "can't read local variable `a` in it's own initializer".to_string(),
+        }),
+      ),
+      (
+        "{ var a = 3; var a = 4; }",
+        Err(LoxErr::Resolve {
+          line: 1,
+          message: "already a variable with the name `a` in this scope".to_string(),
+        }),
+      ),
+      (
+        "return 3;",
+        Err(LoxErr::Resolve {
+          line: 1,
+          message: "can't return from top-level code".to_string(),
+        }),
+      ),
     ];
     for (input, expected) in cases {
       assert_eq!(interpret(input), expected);
@@ -438,6 +499,7 @@ mod tests {
     let mut parser = Parser::new(&stmt);
     let mut interpreter = Interpreter::new();
     let mut stmts = parser.parse().unwrap();
+    resolve(&mut stmts)?;
     assert_eq!(stmts.len(), 1);
     let mut expr = match stmts.pop().unwrap() {
       Stmt::Expression(expr) => expr,
@@ -450,6 +512,7 @@ mod tests {
     let mut parser = Parser::from_str(input);
     let mut interpreter = Interpreter::new();
     let mut stmts = parser.parse().unwrap();
+    resolve(&mut stmts)?;
     interpreter.interpret(&mut stmts)?;
     interpreter.last_result.unwrap()
   }

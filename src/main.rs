@@ -7,6 +7,7 @@ mod expr;
 mod obj;
 mod parse;
 mod peektwo;
+mod resolver;
 mod rlox;
 mod scan;
 mod stmt;

@@ -196,9 +196,10 @@ impl<'a> Parser<'a> {
     if let Some(equals) = self.consume_if(Equal) {
       let value = self.parse_assignment()?;
       match expr {
-        Expr::Variable(token) => Ok(Expr::Assign(Assign {
-          name: token,
+        Expr::Variable(variable) => Ok(Expr::Assign(Assign {
+          name: variable.name,
           value: Box::new(value),
+          distance: None,
         })),
         _ => Err(LoxErr::Parse {
           line: equals.line(),
@@ -317,7 +318,10 @@ impl<'a> Parser<'a> {
     } else if self.consume_discarding(Nil) {
       Ok(Expr::Literal(Literal::Nil))
     } else if let Some(token) = self.consume_if(Identifier) {
-      Ok(Expr::Variable(token))
+      Ok(Expr::Variable(Variable {
+        name: token,
+        distance: None,
+      }))
     } else if let Some(token) = self.consume_one_of(&[Number, Str]) {
       match token {
         Token::Number(_, number) => Ok(Expr::Literal(Literal::Number(number))),
@@ -511,6 +515,7 @@ mod tests {
         Expr::Assign(Assign {
           name: Token::Identifier(1, "x".to_string()),
           value: Box::new(Expr::Literal(Literal::True)),
+          distance: None,
         }),
       ),
       (
@@ -522,6 +527,7 @@ mod tests {
             operator: BinaryOp::Plus(1),
             right: Box::new(Expr::Literal(Literal::Number(1.3))),
           })),
+          distance: None,
         }),
       ),
     ]);
@@ -533,7 +539,10 @@ mod tests {
       (
         "x or true",
         Expr::Logical(Logical {
-          left: Box::new(Expr::Variable(Token::Identifier(1, "x".to_string()))),
+          left: Box::new(Expr::Variable(Variable {
+            name: Token::Identifier(1, "x".to_string()),
+            distance: None,
+          })),
           operator: LogicalOp::Or(1),
           right: Box::new(Expr::Literal(Literal::True)),
         }),
@@ -555,7 +564,10 @@ mod tests {
       (
         "foo()",
         Expr::Call(Call {
-          callee: Box::new(Expr::Variable(Token::Identifier(1, "foo".to_string()))),
+          callee: Box::new(Expr::Variable(Variable {
+            name: Token::Identifier(1, "foo".to_string()),
+            distance: None,
+          })),
           paren: Token::RightParen(1),
           args: vec![],
         }),
@@ -563,7 +575,10 @@ mod tests {
       (
         "foo(true)",
         Expr::Call(Call {
-          callee: Box::new(Expr::Variable(Token::Identifier(1, "foo".to_string()))),
+          callee: Box::new(Expr::Variable(Variable {
+            name: Token::Identifier(1, "foo".to_string()),
+            distance: None,
+          })),
           paren: Token::RightParen(1),
           args: vec![Expr::Literal(Literal::True)],
         }),
@@ -571,7 +586,10 @@ mod tests {
       (
         "foo(1,2,3)",
         Expr::Call(Call {
-          callee: Box::new(Expr::Variable(Token::Identifier(1, "foo".to_string()))),
+          callee: Box::new(Expr::Variable(Variable {
+            name: Token::Identifier(1, "foo".to_string()),
+            distance: None,
+          })),
           paren: Token::RightParen(1),
           args: vec![
             Expr::Literal(Literal::Number(1.0)),
@@ -686,7 +704,10 @@ mod tests {
           params: vec![Token::Identifier(1, "x".to_string())],
           body: vec![Stmt::Return {
             keyword: Token::Return(1),
-            value: Some(Expr::Variable(Token::Identifier(1, "x".to_string()))),
+            value: Some(Expr::Variable(Variable {
+              name: Token::Identifier(1, "x".to_string()),
+              distance: None,
+            })),
           }],
         }),
       ),
@@ -733,7 +754,10 @@ mod tests {
       (
         "if (x) { 3; }",
         Stmt::If(IfStmt {
-          condition: Expr::Variable(Token::Identifier(1, "x".to_string())),
+          condition: Expr::Variable(Variable {
+            name: Token::Identifier(1, "x".to_string()),
+            distance: None,
+          }),
           then_branch: Box::new(Stmt::Block(vec![Stmt::Expression(Expr::Literal(
             Literal::Number(3.0),
           ))])),
@@ -743,7 +767,10 @@ mod tests {
       (
         "if (x) { 3; } else { nil; }",
         Stmt::If(IfStmt {
-          condition: Expr::Variable(Token::Identifier(1, "x".to_string())),
+          condition: Expr::Variable(Variable {
+            name: Token::Identifier(1, "x".to_string()),
+            distance: None,
+          }),
           then_branch: Box::new(Stmt::Block(vec![Stmt::Expression(Expr::Literal(
             Literal::Number(3.0),
           ))])),
@@ -761,7 +788,10 @@ mod tests {
       (
         "while (x) { 3; }",
         Stmt::While(WhileStmt {
-          condition: Expr::Variable(Token::Identifier(1, "x".to_string())),
+          condition: Expr::Variable(Variable {
+            name: Token::Identifier(1, "x".to_string()),
+            distance: None,
+          }),
           body: Box::new(Stmt::Block(vec![Stmt::Expression(Expr::Literal(
             Literal::Number(3.0),
           ))])),
@@ -784,19 +814,29 @@ mod tests {
           },
           Stmt::While(WhileStmt {
             condition: Expr::Binary(Binary {
-              left: Box::new(Expr::Variable(Token::Identifier(1, "i".to_string()))),
+              left: Box::new(Expr::Variable(Variable {
+                name: Token::Identifier(1, "i".to_string()),
+                distance: None,
+              })),
               operator: BinaryOp::Less(1),
               right: Box::new(Expr::Literal(Literal::Number(10.0))),
             }),
             body: Box::new(Stmt::Block(vec![
-              Stmt::Print(Expr::Variable(Token::Identifier(1, "i".to_string()))),
+              Stmt::Print(Expr::Variable(Variable {
+                name: Token::Identifier(1, "i".to_string()),
+                distance: None,
+              })),
               Stmt::Expression(Expr::Assign(Assign {
                 name: Token::Identifier(1, "i".to_string()),
                 value: Box::new(Expr::Binary(Binary {
-                  left: Box::new(Expr::Variable(Token::Identifier(1, "i".to_string()))),
+                  left: Box::new(Expr::Variable(Variable {
+                    name: Token::Identifier(1, "i".to_string()),
+                    distance: None,
+                  })),
                   operator: BinaryOp::Plus(1),
                   right: Box::new(Expr::Literal(Literal::Number(1.0))),
                 })),
+                distance: None,
               })),
             ])),
           }),

@@ -5,13 +5,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-fn resolve_global(name: &str) -> Option<Obj> {
-  match name {
-    "clock" => Some(Obj::NativeFunc(NativeFunc::Clock)),
-    _ => None,
-  }
-}
-
 #[derive(Debug)]
 pub struct Env {
   pub enclosing: Option<Rc<RefCell<Env>>>,
@@ -29,13 +22,21 @@ impl Env {
     self.values.insert(name, value);
   }
 
+  pub fn get_at(&mut self, distance: usize, name: &Token) -> Result<Obj> {
+    self.with_ancestor_at(distance, |env| env.get(&name))
+  }
+
+  pub fn assign_at(&mut self, distance: usize, name: &Token, value: Obj) -> Result<()> {
+    self.with_ancestor_at(distance, |env| env.assign(name, value))
+  }
+
   pub fn get(&mut self, name: &Token) -> Result<Obj> {
     match self.values.get(name.lexeme()) {
       Some(obj) => Ok(obj.clone()),
       None => {
         if let Some(enclosing) = &self.enclosing {
           enclosing.borrow_mut().get(name)
-        } else if let Some(native_func) = resolve_global(name.lexeme()) {
+        } else if let Some(native_func) = resolve_native_func(name.lexeme()) {
           Ok(native_func.clone())
         } else {
           Err(LoxErr::Runtime {
@@ -73,5 +74,27 @@ impl Env {
       enclosing: Some(env),
       values: HashMap::new(),
     }
+  }
+
+  fn with_ancestor_at<F, T>(&mut self, distance: usize, f: F) -> T
+  where
+    F: FnOnce(&mut Self) -> T,
+  {
+    if distance == 0 {
+      return f(self);
+    }
+    let mut enclosing = self
+      .enclosing
+      .as_ref()
+      .expect("expected enclosing environment")
+      .borrow_mut();
+    return enclosing.with_ancestor_at(distance - 1, f);
+  }
+}
+
+fn resolve_native_func(name: &str) -> Option<Obj> {
+  match name {
+    "clock" => Some(Obj::NativeFunc(NativeFunc::Clock)),
+    _ => None,
   }
 }

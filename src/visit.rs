@@ -9,7 +9,7 @@ pub trait ExprVisitor {
   fn visit_literal(&mut self, literal: &mut Literal) -> Self::Result;
   fn visit_logical(&mut self, logical: &mut Logical) -> Self::Result;
   fn visit_unary(&mut self, unary: &mut Unary) -> Self::Result;
-  fn visit_variable(&mut self, variable: &mut Token) -> Self::Result;
+  fn visit_variable(&mut self, variable: &mut Variable) -> Self::Result;
   fn visit_call(&mut self, call: &mut Call) -> Self::Result;
 }
 

@@ -1,4 +1,5 @@
 use crate::err::LoxErr;
+use crate::resolver::Resolvable;
 use crate::tok::{Token, TokenType};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -9,14 +10,21 @@ pub enum Expr {
   Literal(Literal),
   Logical(Logical),
   Grouping(Grouping),
-  Variable(Token),
+  Variable(Variable),
   Assign(Assign),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Variable {
+  pub name: Token,
+  pub distance: Option<usize>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Assign {
   pub name: Token,
   pub value: Box<Expr>,
+  pub distance: Option<usize>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -201,5 +209,29 @@ impl TryFrom<Token> for LogicalOp {
         message: format!("invalid token `{}` for logical operator", token.lexeme()),
       }),
     }
+  }
+}
+
+impl Resolvable for Assign {
+  fn name(&self) -> &Token {
+    &self.name
+  }
+  fn set_distance(&mut self, distance: usize) {
+    self.distance = Some(distance)
+  }
+  fn get_distance(&self) -> Option<usize> {
+    self.distance
+  }
+}
+
+impl Resolvable for Variable {
+  fn name(&self) -> &Token {
+    &self.name
+  }
+  fn set_distance(&mut self, distance: usize) {
+    self.distance = Some(distance)
+  }
+  fn get_distance(&self) -> Option<usize> {
+    self.distance
   }
 }

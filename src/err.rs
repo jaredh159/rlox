@@ -10,6 +10,7 @@ pub enum LoxErr {
   Scan { line: usize, message: String },
   Parse { line: usize, message: String },
   Runtime { line: usize, message: String },
+  Resolve { line: usize, message: String },
   Many(Vec<Box<LoxErr>>),
 }
 
@@ -24,6 +25,7 @@ impl LoxErr {
       LoxErr::Scan { .. } => std::process::exit(65),
       LoxErr::Parse { .. } => std::process::exit(65),
       LoxErr::Runtime { .. } => std::process::exit(70),
+      LoxErr::Resolve { .. } => std::process::exit(70),
       LoxErr::Many(errs) => errs
         .first()
         .map_or_else(|| std::process::exit(1), |err| err.exit()),
@@ -38,6 +40,7 @@ impl Display for LoxErr {
       LoxErr::Scan { line, message } => write!(f, "Scan Error: [line {}] {}", line, message),
       LoxErr::Parse { line, message } => write!(f, "Parse Error: [line {}] {}", line, message),
       LoxErr::Runtime { line, message } => write!(f, "Runtime Error: [line {}] {}", line, message),
+      LoxErr::Resolve { line, message } => write!(f, "Resolve Error: [line {}] {}", line, message),
       LoxErr::Many(errs) => {
         for err in errs {
           err.fmt(f)?;
