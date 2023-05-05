@@ -1,7 +1,8 @@
 use crate::env::Env;
 use crate::err::*;
 use crate::expr::*;
-use crate::obj::{self, Func, Obj::*, *};
+use crate::obj::{Func, Obj::*, *};
+use crate::oop;
 use crate::resolver::Resolvable;
 use crate::stmt::{Class, FnStmt, IfStmt, Stmt, WhileStmt};
 use crate::tok::Token;
@@ -149,7 +150,7 @@ impl StmtVisitor for Interpreter {
       .env
       .borrow_mut()
       .define(name.lexeme().to_string(), Obj::Nil);
-    let runtime_class = obj::Class { name: name.clone() };
+    let runtime_class = oop::Class { name: name.clone() };
     self
       .env
       .borrow_mut()

@@ -5,6 +5,7 @@ mod err;
 mod eval;
 mod expr;
 mod obj;
+mod oop;
 mod parse;
 mod peektwo;
 mod resolver;

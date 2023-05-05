@@ -1,8 +1,8 @@
 use crate::env::Env;
 use crate::err::Result;
 use crate::eval::Interpreter;
+use crate::oop::{Class, Instance};
 use crate::stmt::FnStmt;
-use crate::tok::Token;
 use colored::*;
 use std::cell::RefCell;
 use std::fmt::Debug;
@@ -19,23 +19,13 @@ pub enum Obj {
   NativeFunc(NativeFunc),
   Func(Func),
   Class(Class),
+  Instance(Instance),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Func {
   pub decl: FnStmt,
   pub closure: Rc<RefCell<Env>>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Class {
-  pub name: Token,
-}
-
-impl Display for Class {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "<Class: {}>", self.name.lexeme())
-  }
 }
 
 impl Callable for Func {
@@ -106,6 +96,7 @@ impl Obj {
     match self {
       Obj::NativeFunc(func) => Some(Box::new(func.clone())),
       Obj::Func(func) => Some(Box::new(func.clone())),
+      Obj::Class(class) => Some(Box::new(class.clone())),
       _ => None,
     }
   }
@@ -119,6 +110,7 @@ impl Obj {
       Obj::NativeFunc(native_fn) => println!("{}", format!("{native_fn}").dimmed()),
       Obj::Func(func) => println!("{}", format!("{func}").dimmed()),
       Obj::Class(class) => println!("{}", format!("{class}").dimmed()),
+      Obj::Instance(instance) => println!("{}", format!("{instance}").dimmed()),
     }
   }
 }
