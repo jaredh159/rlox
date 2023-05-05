@@ -23,6 +23,7 @@ pub trait StmtVisitor {
   fn visit_while(&mut self, while_stmt: &mut WhileStmt) -> Self::Result;
   fn visit_fn(&mut self, fn_stmt: &mut FnStmt) -> Self::Result;
   fn visit_return(&mut self, keyword: &Token, value: Option<&mut Expr>) -> Self::Result;
+  fn visit_class(&mut self, class: &mut Class) -> Self::Result;
 }
 
 pub trait ExprVisitable {
@@ -59,6 +60,7 @@ impl StmtVisitable for Stmt {
       Stmt::While(while_stmt) => visitor.visit_while(while_stmt),
       Stmt::Function(fn_stmt) => visitor.visit_fn(fn_stmt),
       Stmt::Return { keyword, value } => visitor.visit_return(keyword, value.as_mut()),
+      Stmt::Class(class) => visitor.visit_class(class),
     }
   }
 }

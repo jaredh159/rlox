@@ -1,6 +1,6 @@
 use crate::err::*;
 use crate::expr::*;
-use crate::stmt::{FnStmt, IfStmt, Stmt, WhileStmt};
+use crate::stmt::{Class, FnStmt, IfStmt, Stmt, WhileStmt};
 use crate::tok::Token;
 use crate::visit::*;
 use std::borrow::BorrowMut;
@@ -158,6 +158,12 @@ impl StmtVisitor for Resolver {
     } else {
       value.map_or_else(|| Ok(()), |value| self.resolve_expr(value))
     }
+  }
+
+  fn visit_class(&mut self, class: &mut Class) -> Self::Result {
+    self.declare(&class.name)?;
+    self.define(&class.name);
+    Ok(())
   }
 }
 

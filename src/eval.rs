@@ -1,9 +1,9 @@
 use crate::env::Env;
 use crate::err::*;
 use crate::expr::*;
-use crate::obj::{Func, Obj::*, *};
+use crate::obj::{self, Func, Obj::*, *};
 use crate::resolver::Resolvable;
-use crate::stmt::{FnStmt, IfStmt, Stmt, WhileStmt};
+use crate::stmt::{Class, FnStmt, IfStmt, Stmt, WhileStmt};
 use crate::tok::Token;
 use crate::visit::*;
 use std::cell::RefCell;
@@ -140,6 +140,20 @@ impl StmtVisitor for Interpreter {
   fn visit_return(&mut self, _keyword: &Token, value: Option<&mut Expr>) -> Self::Result {
     let value = value.map_or(Ok(Obj::Nil), |expr| self.evaluate(expr))?;
     self.return_value = Some(value);
+    Ok(())
+  }
+
+  fn visit_class(&mut self, class_node: &mut Class) -> Self::Result {
+    let name = &class_node.name;
+    self
+      .env
+      .borrow_mut()
+      .define(name.lexeme().to_string(), Obj::Nil);
+    let runtime_class = obj::Class { name: name.clone() };
+    self
+      .env
+      .borrow_mut()
+      .assign(name, Obj::Class(runtime_class))?;
     Ok(())
   }
 }

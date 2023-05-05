@@ -16,6 +16,13 @@ pub enum Stmt {
     value: Option<Expr>,
   },
   While(WhileStmt),
+  Class(Class),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Class {
+  pub name: Token,
+  pub methods: Vec<Stmt>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

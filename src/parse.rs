@@ -1,7 +1,7 @@
 use crate::err::{LoxErr, Result};
 use crate::expr::*;
 use crate::scan::Scanner;
-use crate::stmt::{Stmt, *};
+use crate::stmt::{self, Stmt, *};
 use crate::tok::{Token, TokenType, TokenType::*};
 use std::iter::Peekable;
 
@@ -36,6 +36,8 @@ impl<'a> Parser<'a> {
   fn parse_declaration(&mut self) -> Result<Stmt> {
     if self.consume_discarding(Fun) {
       self.parse_fn_declaration(FnKind::Function)
+    } else if self.consume_discarding(Class) {
+      self.parse_class_declaration()
     } else if self.consume_discarding(Var) {
       self.parse_variable_declaration()
     } else {
@@ -65,6 +67,17 @@ impl<'a> Parser<'a> {
     self.consume_expecting(LeftBrace, kind.lbrace_error())?;
     let body = self.parse_block()?;
     Ok(Stmt::Function(FnStmt { name, params, body }))
+  }
+
+  fn parse_class_declaration(&mut self) -> Result<Stmt> {
+    let name = self.consume_expecting(Identifier, "expected class name")?;
+    self.consume_expecting(LeftBrace, "expected `{` before class body")?;
+    let mut methods = Vec::new();
+    while !self.peek_is(&RightBrace) && !self.is_at_end() {
+      methods.push(self.parse_fn_declaration(FnKind::Method)?);
+    }
+    self.consume_expecting(RightBrace, "expected `}` after class body")?;
+    Ok(Stmt::Class(stmt::Class { name, methods }))
   }
 
   fn parse_variable_declaration(&mut self) -> Result<Stmt> {
@@ -780,6 +793,30 @@ mod tests {
         }),
       ),
     ]);
+  }
+
+  #[test]
+  fn test_parse_class_stmts() {
+    assert_parsed_statements(vec![
+      (
+        "class Breakfast {}",
+        Stmt::Class(Class {
+          name: Token::Identifier(1, "Breakfast".to_string()),
+          methods: vec![],
+        }),
+      ),
+      (
+        "class Breakfast { foo() { nil; } }",
+        Stmt::Class(Class {
+          name: Token::Identifier(1, "Breakfast".to_string()),
+          methods: vec![Stmt::Function(FnStmt {
+            name: Token::Identifier(1, "foo".to_string()),
+            params: vec![],
+            body: vec![Stmt::Expression(Expr::Literal(Literal::Nil))],
+          })],
+        }),
+      ),
+    ])
   }
 
   #[test]
