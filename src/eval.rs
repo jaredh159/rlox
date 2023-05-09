@@ -286,6 +286,32 @@ impl ExprVisitor for Interpreter {
       }
     }
   }
+
+  fn visit_get(&mut self, get: &mut Get) -> Self::Result {
+    let object = self.evaluate(&mut get.object)?;
+    if let Obj::Instance(instance) = object {
+      instance.borrow().get(&get.name)
+    } else {
+      Err(LoxErr::Runtime {
+        line: get.name.line(),
+        message: "only instances have properties".to_string(),
+      })
+    }
+  }
+
+  fn visit_set(&mut self, set: &mut Set) -> Self::Result {
+    let object = self.evaluate(&mut set.object)?;
+    if let Obj::Instance(instance) = object {
+      let value = self.evaluate(&mut set.value)?;
+      instance.borrow_mut().set(&set.name, value.clone());
+      Ok(value)
+    } else {
+      Err(LoxErr::Runtime {
+        line: set.name.line(),
+        message: "only instances have fields".to_string(),
+      })
+    }
+  }
 }
 
 fn runtime<S>(line: &usize, message: S) -> LoxErr
@@ -459,6 +485,7 @@ mod tests {
         "fun sum(x, y, z) { return x + y + z; } sum(1, 2, 3);",
         Obj::Num(6.0),
       ),
+      ("class Foo {} var x = Foo(); x.y = 1; x.y;", Obj::Num(1.0)),
     ];
     for (input, expected) in cases {
       assert_eq!(interpret(input).unwrap(), expected);
@@ -501,6 +528,27 @@ mod tests {
         Err(LoxErr::Resolve {
           line: 1,
           message: "can't return from top-level code".to_string(),
+        }),
+      ),
+      (
+        "var x = 3; x.foo;",
+        Err(LoxErr::Runtime {
+          line: 1,
+          message: "only instances have properties".to_string(),
+        }),
+      ),
+      (
+        "var x = 3; x.foo = 3;",
+        Err(LoxErr::Runtime {
+          line: 1,
+          message: "only instances have fields".to_string(),
+        }),
+      ),
+      (
+        "class Foo {} var x = Foo(); x.bar;",
+        Err(LoxErr::Runtime {
+          line: 1,
+          message: "undefined property `bar`".to_string(),
         }),
       ),
     ];

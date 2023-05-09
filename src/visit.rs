@@ -11,6 +11,8 @@ pub trait ExprVisitor {
   fn visit_unary(&mut self, unary: &mut Unary) -> Self::Result;
   fn visit_variable(&mut self, variable: &mut Variable) -> Self::Result;
   fn visit_call(&mut self, call: &mut Call) -> Self::Result;
+  fn visit_get(&mut self, get: &mut Get) -> Self::Result;
+  fn visit_set(&mut self, set: &mut Set) -> Self::Result;
 }
 
 pub trait StmtVisitor {
@@ -45,6 +47,8 @@ impl ExprVisitable for Expr {
       Expr::Assign(assign) => visitor.visit_assign(assign),
       Expr::Logical(logical) => visitor.visit_logical(logical),
       Expr::Call(call) => visitor.visit_call(call),
+      Expr::Get(get) => visitor.visit_get(get),
+      Expr::Set(set) => visitor.visit_set(set),
     }
   }
 }

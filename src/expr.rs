@@ -4,14 +4,29 @@ use crate::tok::{Token, TokenType};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
+  Assign(Assign),
   Binary(Binary),
   Call(Call),
-  Unary(Unary),
+  Get(Get),
   Literal(Literal),
   Logical(Logical),
   Grouping(Grouping),
+  Set(Set),
+  Unary(Unary),
   Variable(Variable),
-  Assign(Assign),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Get {
+  pub name: Token,
+  pub object: Box<Expr>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Set {
+  pub name: Token,
+  pub object: Box<Expr>,
+  pub value: Box<Expr>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

@@ -214,6 +214,11 @@ impl<'a> Parser<'a> {
           value: Box::new(value),
           distance: None,
         })),
+        Expr::Get(get) => Ok(Expr::Set(Set {
+          name: get.name,
+          object: get.object,
+          value: Box::new(value),
+        })),
         _ => Err(LoxErr::Parse {
           line: equals.line(),
           message: "invalid assignment target".to_string(),
@@ -294,10 +299,15 @@ impl<'a> Parser<'a> {
 
   fn parse_call(&mut self) -> Result<Expr> {
     let mut expr = self.parse_primary()?;
-    // bob says loop will make sense when we handle properties on objects...
     loop {
       if self.consume_discarding(LeftParen) {
         expr = self.finish_call(expr)?;
+      } else if self.consume_discarding(Dot) {
+        let name = self.consume_expecting(Identifier, "expected property name after `.`")?;
+        expr = Expr::Get(Get {
+          name,
+          object: Box::new(expr),
+        });
       } else {
         break;
       }
@@ -637,6 +647,33 @@ mod tests {
   }
 
   #[test]
+  fn test_parse_get_set_exprs() {
+    assert_parsed_expressions(vec![
+      (
+        "foo.bar",
+        Expr::Get(Get {
+          name: Token::Identifier(1, "bar".to_string()),
+          object: Box::new(Expr::Variable(Variable {
+            name: Token::Identifier(1, "foo".to_string()),
+            distance: None,
+          })),
+        }),
+      ),
+      (
+        "foo.bar = 3",
+        Expr::Set(Set {
+          name: Token::Identifier(1, "bar".to_string()),
+          object: Box::new(Expr::Variable(Variable {
+            name: Token::Identifier(1, "foo".to_string()),
+            distance: None,
+          })),
+          value: Box::new(Expr::Literal(Literal::Number(3.0))),
+        }),
+      ),
+    ]);
+  }
+
+  #[test]
   fn test_parse_errors() {
     let cases = vec![
       (
@@ -644,6 +681,13 @@ mod tests {
         LoxErr::Parse {
           line: 1,
           message: "expected `)` after expression".to_string(),
+        },
+      ),
+      (
+        "foo.;",
+        LoxErr::Parse {
+          line: 1,
+          message: "expected property name after `.`".to_string(),
         },
       ),
       (

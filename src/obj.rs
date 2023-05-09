@@ -19,7 +19,7 @@ pub enum Obj {
   NativeFunc(NativeFunc),
   Func(Func),
   Class(Class),
-  Instance(Instance),
+  Instance(Rc<RefCell<Instance>>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -110,7 +110,7 @@ impl Obj {
       Obj::NativeFunc(native_fn) => println!("{}", format!("{native_fn}").dimmed()),
       Obj::Func(func) => println!("{}", format!("{func}").dimmed()),
       Obj::Class(class) => println!("{}", format!("{class}").dimmed()),
-      Obj::Instance(instance) => println!("{}", format!("{instance}").dimmed()),
+      Obj::Instance(instance) => println!("{}", format!("{}", instance.as_ref().borrow()).dimmed()),
     }
   }
 }

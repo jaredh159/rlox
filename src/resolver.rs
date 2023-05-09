@@ -221,4 +221,13 @@ impl ExprVisitor for Resolver {
     }
     Ok(())
   }
+
+  fn visit_get(&mut self, get: &mut Get) -> Self::Result {
+    self.resolve_expr(&mut get.object)
+  }
+
+  fn visit_set(&mut self, set: &mut Set) -> Self::Result {
+    self.resolve_expr(&mut set.value)?;
+    self.resolve_expr(&mut set.object)
+  }
 }
