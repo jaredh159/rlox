@@ -8,6 +8,7 @@ use crate::stmt::{Class, FnStmt, IfStmt, Stmt, WhileStmt};
 use crate::tok::Token;
 use crate::visit::*;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct Interpreter {
@@ -61,8 +62,8 @@ impl Interpreter {
   fn lookup_variable(&self, variable: &mut impl Resolvable) -> Result<Obj> {
     variable
       .get_distance()
-      .map_or(self.globals.borrow_mut().get(variable.name()), |distance| {
-        self.env.borrow_mut().get_at(distance, variable.name())
+      .map_or(self.globals.borrow().get(variable.name()), |distance| {
+        self.env.borrow().get_at(distance, variable.name())
       })
   }
 
@@ -150,7 +151,23 @@ impl StmtVisitor for Interpreter {
       .env
       .borrow_mut()
       .define(name.lexeme().to_string(), Obj::Nil);
-    let runtime_class = oop::Class { name: name.clone() };
+
+    let mut methods = HashMap::new();
+    for method in &class_node.methods {
+      methods.insert(
+        method.name.lexeme().to_string(),
+        Func {
+          decl: method.clone(),
+          closure: Rc::clone(&self.env),
+        },
+      );
+    }
+
+    let runtime_class = oop::Class {
+      name: name.clone(),
+      methods,
+    };
+
     self
       .env
       .borrow_mut()
@@ -290,7 +307,7 @@ impl ExprVisitor for Interpreter {
   fn visit_get(&mut self, get: &mut Get) -> Self::Result {
     let object = self.evaluate(&mut get.object)?;
     if let Obj::Instance(instance) = object {
-      instance.borrow().get(&get.name)
+      oop::Instance::get(&get.name, instance)
     } else {
       Err(LoxErr::Runtime {
         line: get.name.line(),
@@ -311,6 +328,10 @@ impl ExprVisitor for Interpreter {
         message: "only instances have fields".to_string(),
       })
     }
+  }
+
+  fn visit_this(&mut self, this: &mut This) -> Self::Result {
+    self.lookup_variable(this)
   }
 }
 
@@ -353,6 +374,24 @@ mod tests {
     for (input, expected) in cases {
       assert_eq!(eval(input).unwrap(), expected);
     }
+  }
+
+  #[test]
+  fn test_bound_methods() {
+    let input = r#"
+      class Person {
+        getName() {
+          return this.name;
+        }
+      }
+      var jane = Person();
+      jane.name = "Jane";
+      var bill = Person();
+      bill.name = "Bill";
+      bill.getName = jane.getName;
+      bill.getName(); // <-- should be "Jane"
+      "#;
+    assert_eq!(interpret(input).unwrap(), Obj::Str("Jane".to_string()));
   }
 
   #[test]
@@ -486,6 +525,14 @@ mod tests {
         Obj::Num(6.0),
       ),
       ("class Foo {} var x = Foo(); x.y = 1; x.y;", Obj::Num(1.0)),
+      (
+        "class Foo { one() { return 1; } } var x = Foo(); x.one();",
+        Obj::Num(1.0),
+      ),
+      (
+        "class Foo { incrX() { return this.x + 1; } } var x = Foo(); x.x = 2; x.incrX();",
+        Obj::Num(3.0),
+      ),
     ];
     for (input, expected) in cases {
       assert_eq!(interpret(input).unwrap(), expected);

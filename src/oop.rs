@@ -1,7 +1,7 @@
 use crate::err::{LoxErr, Result};
 use crate::eval::Interpreter;
-use crate::obj::Callable;
 use crate::obj::Obj;
+use crate::obj::{Callable, Func};
 use crate::tok::Token;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -11,6 +11,7 @@ use std::rc::Rc;
 #[derive(Debug, PartialEq, Clone)]
 pub struct Class {
   pub name: Token,
+  pub methods: HashMap<String, Func>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -20,14 +21,17 @@ pub struct Instance {
 }
 
 impl Instance {
-  pub fn get(&self, name: &Token) -> Result<Obj> {
-    self.fields.get(name.lexeme()).map_or(
+  pub fn get(name: &Token, instance: Rc<RefCell<Self>>) -> Result<Obj> {
+    if let Some(field) = instance.borrow().fields.get(name.lexeme()) {
+      Ok(field.clone())
+    } else if let Some(method) = instance.borrow().class.methods.get(name.lexeme()) {
+      Ok(Obj::Func(method.bind(Rc::clone(&instance))))
+    } else {
       Err(LoxErr::Runtime {
         line: name.line(),
         message: format!("undefined property `{}`", name.lexeme()),
-      }),
-      |obj| Ok(obj.clone()),
-    )
+      })
+    }
   }
 
   pub fn set(&mut self, name: &Token, value: Obj) {

@@ -13,6 +13,7 @@ pub trait ExprVisitor {
   fn visit_call(&mut self, call: &mut Call) -> Self::Result;
   fn visit_get(&mut self, get: &mut Get) -> Self::Result;
   fn visit_set(&mut self, set: &mut Set) -> Self::Result;
+  fn visit_this(&mut self, this: &mut This) -> Self::Result;
 }
 
 pub trait StmtVisitor {
@@ -49,6 +50,7 @@ impl ExprVisitable for Expr {
       Expr::Call(call) => visitor.visit_call(call),
       Expr::Get(get) => visitor.visit_get(get),
       Expr::Set(set) => visitor.visit_set(set),
+      Expr::This(this) => visitor.visit_this(this),
     }
   }
 }

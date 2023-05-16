@@ -1,5 +1,5 @@
 use crate::err::{LoxErr, Result};
-use crate::expr::*;
+use crate::expr::{self, *};
 use crate::scan::Scanner;
 use crate::stmt::{self, Stmt, *};
 use crate::tok::{Token, TokenType, TokenType::*};
@@ -46,6 +46,10 @@ impl<'a> Parser<'a> {
   }
 
   fn parse_fn_declaration(&mut self, kind: FnKind) -> Result<Stmt> {
+    Ok(Stmt::Function(self.parse_fn_stmt(kind)?))
+  }
+
+  fn parse_fn_stmt(&mut self, kind: FnKind) -> Result<FnStmt> {
     let name = self.consume_expecting(Identifier, kind.ident_error())?;
     self.consume_expecting(LeftParen, kind.lparen_error())?;
     let mut params = Vec::new();
@@ -66,7 +70,7 @@ impl<'a> Parser<'a> {
     self.consume_expecting(RightParen, "expected `)` after parameters")?;
     self.consume_expecting(LeftBrace, kind.lbrace_error())?;
     let body = self.parse_block()?;
-    Ok(Stmt::Function(FnStmt { name, params, body }))
+    Ok(FnStmt { name, params, body })
   }
 
   fn parse_class_declaration(&mut self) -> Result<Stmt> {
@@ -74,7 +78,7 @@ impl<'a> Parser<'a> {
     self.consume_expecting(LeftBrace, "expected `{` before class body")?;
     let mut methods = Vec::new();
     while !self.peek_is(&RightBrace) && !self.is_at_end() {
-      methods.push(self.parse_fn_declaration(FnKind::Method)?);
+      methods.push(self.parse_fn_stmt(FnKind::Method)?);
     }
     self.consume_expecting(RightBrace, "expected `}` after class body")?;
     Ok(Stmt::Class(stmt::Class { name, methods }))
@@ -338,6 +342,11 @@ impl<'a> Parser<'a> {
       Ok(Expr::Literal(Literal::False))
     } else if self.consume_discarding(True) {
       Ok(Expr::Literal(Literal::True))
+    } else if let Some(token) = self.consume_if(This) {
+      Ok(Expr::This(expr::This {
+        keyword: token,
+        distance: None,
+      }))
     } else if self.consume_discarding(Nil) {
       Ok(Expr::Literal(Literal::Nil))
     } else if let Some(token) = self.consume_if(Identifier) {
@@ -485,6 +494,13 @@ mod tests {
       ("false", Expr::Literal(Literal::False)),
       ("nil", Expr::Literal(Literal::Nil)),
       ("33.33", Expr::Literal(Literal::Number(33.33))),
+      (
+        "this",
+        Expr::This(expr::This {
+          keyword: Token::This(1),
+          distance: None,
+        }),
+      ),
     ]);
   }
 
@@ -853,11 +869,11 @@ mod tests {
         "class Breakfast { foo() { nil; } }",
         Stmt::Class(Class {
           name: Token::Identifier(1, "Breakfast".to_string()),
-          methods: vec![Stmt::Function(FnStmt {
+          methods: vec![FnStmt {
             name: Token::Identifier(1, "foo".to_string()),
             params: vec![],
             body: vec![Stmt::Expression(Expr::Literal(Literal::Nil))],
-          })],
+          }],
         }),
       ),
     ])

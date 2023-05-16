@@ -17,6 +17,7 @@ pub fn resolve(stmts: &mut Vec<Stmt>) -> Result<()> {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum FunctionType {
   None,
+  Method,
   Function,
 }
 
@@ -49,6 +50,12 @@ impl Resolver {
 
   fn begin_scope(&mut self) {
     self.scopes.push(HashMap::new());
+  }
+
+  fn begin_scope_with(&mut self, name: String, value: bool) {
+    let mut scope = HashMap::new();
+    scope.insert(name, value);
+    self.scopes.push(scope);
   }
 
   fn end_scope(&mut self) {
@@ -163,6 +170,12 @@ impl StmtVisitor for Resolver {
   fn visit_class(&mut self, class: &mut Class) -> Self::Result {
     self.declare(&class.name)?;
     self.define(&class.name);
+    self.begin_scope_with("this".to_string(), true);
+    for mut method in class.methods.iter_mut() {
+      let fn_type = FunctionType::Method;
+      self.resolve_fn(&mut method, fn_type)?;
+    }
+    self.end_scope();
     Ok(())
   }
 }
@@ -229,5 +242,10 @@ impl ExprVisitor for Resolver {
   fn visit_set(&mut self, set: &mut Set) -> Self::Result {
     self.resolve_expr(&mut set.value)?;
     self.resolve_expr(&mut set.object)
+  }
+
+  fn visit_this(&mut self, this: &mut This) -> Self::Result {
+    self.resolve_local(this);
+    Ok(())
   }
 }

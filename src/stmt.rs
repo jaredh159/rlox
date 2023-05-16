@@ -22,7 +22,7 @@ pub enum Stmt {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Class {
   pub name: Token,
-  pub methods: Vec<Stmt>,
+  pub methods: Vec<FnStmt>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

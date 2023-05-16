@@ -12,8 +12,15 @@ pub enum Expr {
   Logical(Logical),
   Grouping(Grouping),
   Set(Set),
+  This(This),
   Unary(Unary),
   Variable(Variable),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct This {
+  pub keyword: Token,
+  pub distance: Option<usize>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -230,6 +237,18 @@ impl TryFrom<Token> for LogicalOp {
 impl Resolvable for Assign {
   fn name(&self) -> &Token {
     &self.name
+  }
+  fn set_distance(&mut self, distance: usize) {
+    self.distance = Some(distance)
+  }
+  fn get_distance(&self) -> Option<usize> {
+    self.distance
+  }
+}
+
+impl Resolvable for This {
+  fn name(&self) -> &Token {
+    &self.keyword
   }
   fn set_distance(&mut self, distance: usize) {
     self.distance = Some(distance)

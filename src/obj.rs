@@ -43,6 +43,19 @@ impl Callable for Func {
   }
 }
 
+impl Func {
+  pub fn bind(&self, instance: Rc<RefCell<Instance>>) -> Func {
+    let env = Rc::clone(&self.closure);
+    env
+      .borrow_mut()
+      .define("this".to_string(), Obj::Instance(instance));
+    Func {
+      decl: self.decl.clone(),
+      closure: env,
+    }
+  }
+}
+
 impl Display for Func {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "<fun: {}>", self.decl.name.lexeme())
