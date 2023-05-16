@@ -10,6 +10,7 @@ pub fn resolve(stmts: &mut Vec<Stmt>) -> Result<()> {
   Resolver {
     scopes: Vec::new(),
     current_fn: FunctionType::None,
+    current_class: ClassType::None,
   }
   .resolve_stmts(stmts)
 }
@@ -21,9 +22,16 @@ enum FunctionType {
   Function,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum ClassType {
+  None,
+  Class,
+}
+
 struct Resolver {
   scopes: Vec<HashMap<String, bool>>,
   current_fn: FunctionType,
+  current_class: ClassType,
 }
 
 pub trait Resolvable {
@@ -168,6 +176,8 @@ impl StmtVisitor for Resolver {
   }
 
   fn visit_class(&mut self, class: &mut Class) -> Self::Result {
+    let enclosing_class = self.current_class;
+    self.current_class = ClassType::Class;
     self.declare(&class.name)?;
     self.define(&class.name);
     self.begin_scope_with("this".to_string(), true);
@@ -176,6 +186,7 @@ impl StmtVisitor for Resolver {
       self.resolve_fn(&mut method, fn_type)?;
     }
     self.end_scope();
+    self.current_class = enclosing_class;
     Ok(())
   }
 }
@@ -245,6 +256,12 @@ impl ExprVisitor for Resolver {
   }
 
   fn visit_this(&mut self, this: &mut This) -> Self::Result {
+    if self.current_class == ClassType::None {
+      return Err(LoxErr::Resolve {
+        line: this.keyword.line(),
+        message: "can't use `this` outside of a class".to_string(),
+      });
+    }
     self.resolve_local(this);
     Ok(())
   }

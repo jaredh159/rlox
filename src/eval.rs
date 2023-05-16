@@ -598,6 +598,20 @@ mod tests {
           message: "undefined property `bar`".to_string(),
         }),
       ),
+      (
+        "print this;",
+        Err(LoxErr::Resolve {
+          line: 1,
+          message: "can't use `this` outside of a class".to_string(),
+        }),
+      ),
+      (
+        "fun notAMethod() { return this; }",
+        Err(LoxErr::Resolve {
+          line: 1,
+          message: "can't use `this` outside of a class".to_string(),
+        }),
+      ),
     ];
     for (input, expected) in cases {
       assert_eq!(interpret(input), expected);
