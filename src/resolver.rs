@@ -18,8 +18,19 @@ pub fn resolve(stmts: &mut Vec<Stmt>) -> Result<()> {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum FunctionType {
   None,
-  Method,
   Function,
+  Initializer,
+  Method,
+}
+
+impl FunctionType {
+  fn from_method(method: &mut FnStmt) -> Self {
+    if method.name.lexeme() == "init" {
+      FunctionType::Initializer
+    } else {
+      FunctionType::Method
+    }
+  }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -171,7 +182,19 @@ impl StmtVisitor for Resolver {
         message: "can't return from top-level code".to_string(),
       })
     } else {
-      value.map_or_else(|| Ok(()), |value| self.resolve_expr(value))
+      value.map_or_else(
+        || Ok(()),
+        |value| {
+          if self.current_fn == FunctionType::Initializer {
+            Err(LoxErr::Resolve {
+              line: keyword.line(),
+              message: "can't return a value from an initializer".to_string(),
+            })
+          } else {
+            self.resolve_expr(value)
+          }
+        },
+      )
     }
   }
 
@@ -182,7 +205,7 @@ impl StmtVisitor for Resolver {
     self.define(&class.name);
     self.begin_scope_with("this".to_string(), true);
     for mut method in class.methods.iter_mut() {
-      let fn_type = FunctionType::Method;
+      let fn_type = FunctionType::from_method(method);
       self.resolve_fn(&mut method, fn_type)?;
     }
     self.end_scope();

@@ -3,6 +3,7 @@ use crate::err::Result;
 use crate::eval::Interpreter;
 use crate::oop::{Class, Instance};
 use crate::stmt::FnStmt;
+use crate::tok::Token;
 use colored::*;
 use std::cell::RefCell;
 use std::fmt::Debug;
@@ -26,6 +27,7 @@ pub enum Obj {
 pub struct Func {
   pub decl: FnStmt,
   pub closure: Rc<RefCell<Env>>,
+  pub is_initializer: bool,
 }
 
 impl Callable for Func {
@@ -35,7 +37,13 @@ impl Callable for Func {
       env.define(param.lexeme().to_string(), arg);
     }
     interpreter.interpret_block(&mut self.decl.body, Some(Rc::new(RefCell::new(env))))?;
-    Ok(interpreter.return_value.take().unwrap_or(Obj::Nil))
+    let return_value = interpreter.return_value.take();
+    if self.is_initializer {
+      let decl_line = self.decl.name.line();
+      Ok(self.closure.borrow().get_at(0, &Token::This(decl_line))?)
+    } else {
+      Ok(return_value.unwrap_or(Obj::Nil))
+    }
   }
 
   fn arity(&self) -> usize {
@@ -52,6 +60,7 @@ impl Func {
     Func {
       decl: self.decl.clone(),
       closure: env,
+      is_initializer: self.is_initializer,
     }
   }
 }

@@ -40,15 +40,20 @@ impl Instance {
 }
 
 impl Callable for Class {
-  fn call(&mut self, _: &mut Interpreter, _: Vec<Obj>) -> Result<Obj> {
-    Ok(Obj::Instance(Rc::new(RefCell::new(Instance {
+  fn call(&mut self, interpreter: &mut Interpreter, args: Vec<Obj>) -> Result<Obj> {
+    let instance = Rc::new(RefCell::new(Instance {
       class: self.clone(),
       fields: HashMap::new(),
-    }))))
+    }));
+    if let Some(initializer) = self.methods.get_mut("init") {
+      initializer.bind(Rc::clone(&instance));
+      initializer.call(interpreter, args)?;
+    }
+    Ok(Obj::Instance(instance))
   }
 
   fn arity(&self) -> usize {
-    0
+    self.methods.get("init").map_or(0, |init| init.arity())
   }
 }
 

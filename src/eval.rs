@@ -134,6 +134,7 @@ impl StmtVisitor for Interpreter {
       Obj::Func(Func {
         decl: fn_stmt.clone(),
         closure: Rc::clone(&self.env),
+        is_initializer: false,
       }),
     );
     Ok(())
@@ -159,6 +160,7 @@ impl StmtVisitor for Interpreter {
         Func {
           decl: method.clone(),
           closure: Rc::clone(&self.env),
+          is_initializer: method.name.lexeme() == "init",
         },
       );
     }
@@ -533,6 +535,18 @@ mod tests {
         "class Foo { incrX() { return this.x + 1; } } var x = Foo(); x.x = 2; x.incrX();",
         Obj::Num(3.0),
       ),
+      (
+        "class Foo { init(x) { this.x = x; } } var x = Foo(7); x.x;",
+        Obj::Num(7.0),
+      ),
+      (
+        "class Foo { init(x) { this.x = x; } } var x = Foo(7); var y = x.init(3); y.x;",
+        Obj::Num(3.0),
+      ),
+      (
+        "class Foo { init() { return; } } var x = Foo(); var y = x.init(); y.x = 4; y.x;",
+        Obj::Num(4.0),
+      ),
     ];
     for (input, expected) in cases {
       assert_eq!(interpret(input).unwrap(), expected);
@@ -610,6 +624,13 @@ mod tests {
         Err(LoxErr::Resolve {
           line: 1,
           message: "can't use `this` outside of a class".to_string(),
+        }),
+      ),
+      (
+        "class Foo { init() { return 3; } }",
+        Err(LoxErr::Resolve {
+          line: 1,
+          message: "can't return a value from an initializer".to_string(),
         }),
       ),
     ];
