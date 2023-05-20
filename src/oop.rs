@@ -12,6 +12,7 @@ use std::rc::Rc;
 pub struct Class {
   pub name: Token,
   pub methods: HashMap<String, Func>,
+  pub superclass: Option<Box<Class>>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

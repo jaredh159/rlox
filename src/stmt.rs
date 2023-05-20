@@ -1,4 +1,5 @@
-use crate::{expr::Expr, tok::Token};
+use crate::expr::Expr;
+use crate::tok::Token;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Stmt {
@@ -22,6 +23,7 @@ pub enum Stmt {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Class {
   pub name: Token,
+  pub superclass: Option<Expr>,
   pub methods: Vec<FnStmt>,
 }
 

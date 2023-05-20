@@ -203,6 +203,23 @@ impl StmtVisitor for Resolver {
     self.current_class = ClassType::Class;
     self.declare(&class.name)?;
     self.define(&class.name);
+
+    if class.superclass.is_some() {
+      let superclass = class.superclass.as_mut().unwrap();
+      match superclass {
+        Expr::Variable(variable) => {
+          if variable.name.lexeme() == class.name.lexeme() {
+            return Err(LoxErr::Resolve {
+              line: variable.name.line(),
+              message: "a class can't inherit from itself".to_string(),
+            });
+          }
+        }
+        _ => panic!("unreachable"),
+      }
+      self.resolve_expr(superclass)?;
+    }
+
     self.begin_scope_with("this".to_string(), true);
     for mut method in class.methods.iter_mut() {
       let fn_type = FunctionType::from_method(method);

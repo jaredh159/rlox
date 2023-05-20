@@ -75,13 +75,24 @@ impl<'a> Parser<'a> {
 
   fn parse_class_declaration(&mut self) -> Result<Stmt> {
     let name = self.consume_expecting(Identifier, "expected class name")?;
+    let superclass = match self.consume_discarding(Less) {
+      false => None,
+      true => Some(Expr::Variable(Variable {
+        name: self.consume_expecting(Identifier, "expected superclass name")?,
+        distance: None,
+      })),
+    };
     self.consume_expecting(LeftBrace, "expected `{` before class body")?;
     let mut methods = Vec::new();
     while !self.peek_is(&RightBrace) && !self.is_at_end() {
       methods.push(self.parse_fn_stmt(FnKind::Method)?);
     }
     self.consume_expecting(RightBrace, "expected `}` after class body")?;
-    Ok(Stmt::Class(stmt::Class { name, methods }))
+    Ok(Stmt::Class(stmt::Class {
+      name,
+      methods,
+      superclass,
+    }))
   }
 
   fn parse_variable_declaration(&mut self) -> Result<Stmt> {
@@ -728,6 +739,13 @@ mod tests {
         },
       ),
       (
+        "class Foo < {}",
+        LoxErr::Parse {
+          line: 1,
+          message: "expected superclass name".to_string(),
+        },
+      ),
+      (
         "(true; *;",
         LoxErr::Many(vec![
           Box::new(LoxErr::Parse {
@@ -862,6 +880,18 @@ mod tests {
         "class Breakfast {}",
         Stmt::Class(Class {
           name: Token::Identifier(1, "Breakfast".to_string()),
+          superclass: None,
+          methods: vec![],
+        }),
+      ),
+      (
+        "class Breakfast < Meal {}",
+        Stmt::Class(Class {
+          name: Token::Identifier(1, "Breakfast".to_string()),
+          superclass: Some(Expr::Variable(Variable {
+            name: Token::Identifier(1, "Meal".to_string()),
+            distance: None,
+          })),
           methods: vec![],
         }),
       ),
@@ -874,6 +904,7 @@ mod tests {
             params: vec![],
             body: vec![Stmt::Expression(Expr::Literal(Literal::Nil))],
           }],
+          superclass: None,
         }),
       ),
     ])

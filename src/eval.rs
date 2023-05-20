@@ -147,6 +147,20 @@ impl StmtVisitor for Interpreter {
   }
 
   fn visit_class(&mut self, class_node: &mut Class) -> Self::Result {
+    let superclass = class_node
+      .superclass
+      .as_mut()
+      .map(|expr| {
+        self.evaluate(expr).map(|obj| match obj {
+          Obj::Class(class) => Ok(Box::new(class)),
+          _ => Err(LoxErr::Runtime {
+            line: 1,
+            message: "superclass must be a class".to_string(),
+          }),
+        })?
+      })
+      .transpose()?;
+
     let name = &class_node.name;
     self
       .env
@@ -167,6 +181,7 @@ impl StmtVisitor for Interpreter {
 
     let runtime_class = oop::Class {
       name: name.clone(),
+      superclass,
       methods,
     };
 
@@ -631,6 +646,20 @@ mod tests {
         Err(LoxErr::Resolve {
           line: 1,
           message: "can't return a value from an initializer".to_string(),
+        }),
+      ),
+      (
+        "class Foo < Foo {}",
+        Err(LoxErr::Resolve {
+          line: 1,
+          message: "a class can't inherit from itself".to_string(),
+        }),
+      ),
+      (
+        "var Bar = 42; class Foo < Bar {}",
+        Err(LoxErr::Runtime {
+          line: 1,
+          message: "superclass must be a class".to_string(),
         }),
       ),
     ];
