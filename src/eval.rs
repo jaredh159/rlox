@@ -152,7 +152,7 @@ impl StmtVisitor for Interpreter {
       .as_mut()
       .map(|expr| {
         self.evaluate(expr).map(|obj| match obj {
-          Obj::Class(class) => Ok(Box::new(class)),
+          Obj::Class(class_obj) => Ok(Box::new(class_obj)),
           _ => Err(LoxErr::Runtime {
             line: 1,
             message: "superclass must be a class".to_string(),
@@ -167,13 +167,22 @@ impl StmtVisitor for Interpreter {
       .borrow_mut()
       .define(name.lexeme().to_string(), Obj::Nil);
 
+    let mut super_env: Option<Rc<RefCell<Env>>> = None;
+    if let Some(superclass) = &superclass {
+      let mut env = Env::new_enclosing(Rc::clone(&self.env));
+      env.define("super".to_string(), Obj::Class(*superclass.clone()));
+      super_env = Some(Rc::new(RefCell::new(env)));
+    }
+
     let mut methods = HashMap::new();
     for method in &class_node.methods {
       methods.insert(
         method.name.lexeme().to_string(),
         Func {
           decl: method.clone(),
-          closure: Rc::clone(&self.env),
+          closure: super_env
+            .as_ref()
+            .map_or_else(|| Rc::clone(&self.env), |super_env| Rc::clone(&super_env)),
           is_initializer: method.name.lexeme() == "init",
         },
       );
@@ -350,6 +359,27 @@ impl ExprVisitor for Interpreter {
   fn visit_this(&mut self, this: &mut This) -> Self::Result {
     self.lookup_variable(this)
   }
+
+  fn visit_super(&mut self, super_expr: &mut Super) -> Self::Result {
+    let distance = super_expr.distance.expect("super should have distance set");
+    let superclass = match self.env.borrow().get_at(distance, &super_expr.keyword) {
+      Ok(Obj::Class(class)) => Ok(class),
+      Err(err) => Err(err),
+      _ => panic!("unreachable"),
+    }?;
+    let this = Token::This(super_expr.keyword.line());
+    let instance = match self.env.borrow().get_at(distance - 1, &this)? {
+      Obj::Instance(instance) => instance,
+      _ => panic!("unreachable"),
+    };
+    let method = superclass
+      .find_method(super_expr.method.lexeme())
+      .ok_or(LoxErr::Runtime {
+        line: super_expr.keyword.line(),
+        message: format!("undefined property `{}`", super_expr.method.lexeme()),
+      })?;
+    Ok(Obj::Func(method.bind(instance)))
+  }
 }
 
 fn runtime<S>(line: &usize, message: S) -> LoxErr
@@ -427,6 +457,32 @@ mod tests {
       }
       "#;
     assert_eq!(interpret(input).unwrap(), Obj::Num(14.0));
+  }
+
+  #[test]
+  fn test_super_resolution() {
+    let input = r#"
+      class A {
+        method() {
+          return "A";
+        }
+      }
+
+      class B < A {
+        method() {
+          return "B";
+        }
+
+        test() {
+          return super.method();
+        }
+      }
+
+      class C < B {}
+
+      C().test();
+      "#;
+    assert_eq!(interpret(input).unwrap(), Obj::Str("A".to_string()));
   }
 
   #[test]
@@ -551,7 +607,7 @@ mod tests {
         Obj::Num(3.0),
       ),
       (
-        "class Foo { init(x) { this.x = x; } } var x = Foo(7); x.x;",
+        "class Foo { init(y) { this.x = y; } } var z = Foo(7); z.x;",
         Obj::Num(7.0),
       ),
       (
@@ -561,6 +617,18 @@ mod tests {
       (
         "class Foo { init() { return; } } var x = Foo(); var y = x.init(); y.x = 4; y.x;",
         Obj::Num(4.0),
+      ),
+      (
+        "class A { get1() { return 1; } } class B < A {} var x = B(); x.get1();",
+        Obj::Num(1.0),
+      ),
+      (
+        "class A { init() { this.x = 5; } } class B < A {} var x = B(); x.x;",
+        Obj::Num(5.0),
+      ),
+      (
+        "class A { init() { this.x = 5; } } class B < A {} class C < B {} var x = C(); x.x;",
+        Obj::Num(5.0),
       ),
     ];
     for (input, expected) in cases {
@@ -660,6 +728,20 @@ mod tests {
         Err(LoxErr::Runtime {
           line: 1,
           message: "superclass must be a class".to_string(),
+        }),
+      ),
+      (
+        "super.notEvenInAClass();",
+        Err(LoxErr::Resolve {
+          line: 1,
+          message: "can't use `super` outside of a class".to_string(),
+        }),
+      ),
+      (
+        "class Eclair { cook() { super.cook(); return 3; } } Eclair().cook();",
+        Err(LoxErr::Resolve {
+          line: 1,
+          message: "can't use `super` in a class with no superclass".to_string(),
         }),
       ),
     ];

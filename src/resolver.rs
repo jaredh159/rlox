@@ -37,6 +37,7 @@ impl FunctionType {
 enum ClassType {
   None,
   Class,
+  SubClass,
 }
 
 struct Resolver {
@@ -217,7 +218,9 @@ impl StmtVisitor for Resolver {
         }
         _ => panic!("unreachable"),
       }
+      self.current_class = ClassType::SubClass;
       self.resolve_expr(superclass)?;
+      self.begin_scope_with("super".to_string(), true)
     }
 
     self.begin_scope_with("this".to_string(), true);
@@ -226,6 +229,11 @@ impl StmtVisitor for Resolver {
       self.resolve_fn(&mut method, fn_type)?;
     }
     self.end_scope();
+
+    if class.superclass.is_some() {
+      self.end_scope();
+    }
+
     self.current_class = enclosing_class;
     Ok(())
   }
@@ -304,5 +312,22 @@ impl ExprVisitor for Resolver {
     }
     self.resolve_local(this);
     Ok(())
+  }
+
+  fn visit_super(&mut self, super_expr: &mut Super) -> Self::Result {
+    match self.current_class {
+      ClassType::None => Err(LoxErr::Resolve {
+        line: super_expr.keyword.line(),
+        message: "can't use `super` outside of a class".to_string(),
+      }),
+      ClassType::Class => Err(LoxErr::Resolve {
+        line: super_expr.keyword.line(),
+        message: "can't use `super` in a class with no superclass".to_string(),
+      }),
+      ClassType::SubClass => {
+        self.resolve_local(super_expr);
+        Ok(())
+      }
+    }
   }
 }

@@ -53,13 +53,11 @@ impl Callable for Func {
 
 impl Func {
   pub fn bind(&self, instance: Rc<RefCell<Instance>>) -> Func {
-    let env = Rc::clone(&self.closure);
-    env
-      .borrow_mut()
-      .define("this".to_string(), Obj::Instance(instance));
+    let mut env = Env::new_enclosing(Rc::clone(&self.closure));
+    env.define("this".to_string(), Obj::Instance(instance));
     Func {
       decl: self.decl.clone(),
-      closure: env,
+      closure: Rc::new(RefCell::new(env)),
       is_initializer: self.is_initializer,
     }
   }

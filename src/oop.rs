@@ -25,7 +25,7 @@ impl Instance {
   pub fn get(name: &Token, instance: Rc<RefCell<Self>>) -> Result<Obj> {
     if let Some(field) = instance.borrow().fields.get(name.lexeme()) {
       Ok(field.clone())
-    } else if let Some(method) = instance.borrow().class.methods.get(name.lexeme()) {
+    } else if let Some(method) = instance.borrow().class.find_method(name.lexeme()) {
       Ok(Obj::Func(method.bind(Rc::clone(&instance))))
     } else {
       Err(LoxErr::Runtime {
@@ -40,15 +40,34 @@ impl Instance {
   }
 }
 
+impl Class {
+  pub fn find_method(&self, name: &str) -> Option<&Func> {
+    self
+      .methods
+      .get(name)
+      .or(self.superclass.as_ref().and_then(|s| s.find_method(name)))
+  }
+
+  pub fn find_method_mut(&mut self, name: &str) -> Option<&mut Func> {
+    self.methods.get_mut(name).or(
+      self
+        .superclass
+        .as_mut()
+        .and_then(|s| s.find_method_mut(name)),
+    )
+  }
+}
+
 impl Callable for Class {
   fn call(&mut self, interpreter: &mut Interpreter, args: Vec<Obj>) -> Result<Obj> {
     let instance = Rc::new(RefCell::new(Instance {
       class: self.clone(),
       fields: HashMap::new(),
     }));
-    if let Some(initializer) = self.methods.get_mut("init") {
-      initializer.bind(Rc::clone(&instance));
-      initializer.call(interpreter, args)?;
+    if let Some(initializer) = self.find_method_mut("init") {
+      initializer
+        .bind(Rc::clone(&instance))
+        .call(interpreter, args)?;
     }
     Ok(Obj::Instance(instance))
   }

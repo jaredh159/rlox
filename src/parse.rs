@@ -358,6 +358,14 @@ impl<'a> Parser<'a> {
         keyword: token,
         distance: None,
       }))
+    } else if let Some(keyword) = self.consume_if(Super) {
+      self.consume_expecting(Dot, "expected `.` after `super`")?;
+      let method = self.consume_expecting(Identifier, "expected superclass method name")?;
+      Ok(Expr::Super(expr::Super {
+        keyword,
+        method,
+        distance: None,
+      }))
     } else if self.consume_discarding(Nil) {
       Ok(Expr::Literal(Literal::Nil))
     } else if let Some(token) = self.consume_if(Identifier) {
@@ -646,6 +654,18 @@ mod tests {
             Expr::Literal(Literal::Number(2.0)),
             Expr::Literal(Literal::Number(3.0)),
           ],
+        }),
+      ),
+      (
+        "super.foo(true)",
+        Expr::Call(Call {
+          callee: Box::new(Expr::Super(Super {
+            keyword: Token::Super(1),
+            method: Token::Identifier(1, "foo".to_string()),
+            distance: None,
+          })),
+          paren: Token::RightParen(1),
+          args: vec![Expr::Literal(Literal::True)],
         }),
       ),
     ]);
