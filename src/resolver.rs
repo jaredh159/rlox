@@ -24,11 +24,11 @@ enum FunctionType {
 }
 
 impl FunctionType {
-  fn from_method(method: &mut FnStmt) -> Self {
+  fn from_method(method: &FnStmt) -> Self {
     if method.name.lexeme() == "init" {
-      FunctionType::Initializer
+      Self::Initializer
     } else {
-      FunctionType::Method
+      Self::Method
     }
   }
 }
@@ -118,8 +118,8 @@ impl Resolver {
     self.current_fn = fn_type;
     self.begin_scope();
     for param in &fn_stmt.params {
-      self.declare(&param)?;
-      self.define(&param);
+      self.declare(param)?;
+      self.define(param);
     }
     self.resolve_stmts(&mut fn_stmt.body)?;
     self.end_scope();
@@ -220,13 +220,13 @@ impl StmtVisitor for Resolver {
       }
       self.current_class = ClassType::SubClass;
       self.resolve_expr(superclass)?;
-      self.begin_scope_with("super".to_string(), true)
+      self.begin_scope_with("super".to_string(), true);
     }
 
     self.begin_scope_with("this".to_string(), true);
-    for mut method in class.methods.iter_mut() {
+    for method in &mut class.methods {
       let fn_type = FunctionType::from_method(method);
-      self.resolve_fn(&mut method, fn_type)?;
+      self.resolve_fn(method, fn_type)?;
     }
     self.end_scope();
 
@@ -288,7 +288,7 @@ impl ExprVisitor for Resolver {
 
   fn visit_call(&mut self, call: &mut Call) -> Self::Result {
     self.resolve_expr(&mut call.callee)?;
-    for arg in call.args.iter_mut() {
+    for arg in &mut call.args {
       self.resolve_expr(arg)?;
     }
     Ok(())

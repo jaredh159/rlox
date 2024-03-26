@@ -27,9 +27,7 @@ impl<'a> Parser<'a> {
     } else if errors.len() == 1 {
       Err(errors.pop().unwrap())
     } else {
-      Err(LoxErr::Many(
-        errors.into_iter().map(Box::new).collect::<Vec<_>>(),
-      ))
+      Err(LoxErr::Many(errors.into_iter().collect::<Vec<_>>()))
     }
   }
 
@@ -53,7 +51,7 @@ impl<'a> Parser<'a> {
     let name = self.consume_expecting(Identifier, kind.ident_error())?;
     self.consume_expecting(LeftParen, kind.lparen_error())?;
     let mut params = Vec::new();
-    if !self.peek_is(&RightParen) {
+    if !self.peek_is(RightParen) {
       loop {
         if params.len() >= 255 {
           return Err(LoxErr::Parse {
@@ -84,22 +82,19 @@ impl<'a> Parser<'a> {
     };
     self.consume_expecting(LeftBrace, "expected `{` before class body")?;
     let mut methods = Vec::new();
-    while !self.peek_is(&RightBrace) && !self.is_at_end() {
+    while !self.peek_is(RightBrace) && !self.is_at_end() {
       methods.push(self.parse_fn_stmt(FnKind::Method)?);
     }
     self.consume_expecting(RightBrace, "expected `}` after class body")?;
-    Ok(Stmt::Class(stmt::Class {
-      name,
-      methods,
-      superclass,
-    }))
+    Ok(Stmt::Class(stmt::Class { name, superclass, methods }))
   }
 
   fn parse_variable_declaration(&mut self) -> Result<Stmt> {
     let name = self.consume_expecting(Identifier, "expected a variable name")?;
-    let initializer = match self.consume_discarding(Equal) {
-      true => Some(self.parse_expression()?),
-      false => None,
+    let initializer = if self.consume_discarding(Equal) {
+      Some(self.parse_expression()?)
+    } else {
+      None
     };
     self.consume_expecting(Semicolon, "expected `;` after variable declaration")?;
     Ok(Stmt::Var { name, initializer })
@@ -125,7 +120,7 @@ impl<'a> Parser<'a> {
 
   fn parse_block(&mut self) -> Result<Vec<Stmt>> {
     let mut stmts = Vec::new();
-    while !self.peek_is(&RightBrace) && !self.is_at_end() {
+    while !self.peek_is(RightBrace) && !self.is_at_end() {
       stmts.push(self.parse_declaration()?);
     }
     self.consume_expecting(RightBrace, "expected `}` after block")?;
@@ -139,9 +134,10 @@ impl<'a> Parser<'a> {
   }
 
   fn parse_return_stmt(&mut self, keyword: Token) -> Result<Stmt> {
-    let value = match self.peek_is(&Semicolon) {
-      false => Some(self.parse_expression()?),
-      true => None,
+    let value = if self.peek_is(Semicolon) {
+      None
+    } else {
+      Some(self.parse_expression()?)
     };
     self.consume_expecting(Semicolon, "expected `;` after return value")?;
     Ok(Stmt::Return { keyword, value })
@@ -163,28 +159,27 @@ impl<'a> Parser<'a> {
       _ => Some(self.parse_expression_stmt()?),
     };
 
-    let condition = match self.peek_is(&Semicolon) {
-      true => None,
-      false => Some(self.parse_expression()?),
+    let condition = if self.peek_is(Semicolon) {
+      None
+    } else {
+      Some(self.parse_expression()?)
     };
     self.consume_expecting(Semicolon, "expected `;` after loop condition")?;
 
-    let increment = match self.peek_is(&RightParen) {
-      true => None,
-      false => Some(self.parse_expression()?),
+    let increment = if self.peek_is(Semicolon) {
+      None
+    } else {
+      Some(self.parse_expression()?)
     };
     self.consume_expecting(RightParen, "expected `)` after for clauses")?;
 
     let mut body = self.parse_statement()?;
     if let Some(increment) = increment {
-      body = Stmt::Block(vec![body, Stmt::Expression(increment)])
+      body = Stmt::Block(vec![body, Stmt::Expression(increment)]);
     }
 
     if let Some(condition) = condition {
-      body = Stmt::While(WhileStmt {
-        condition,
-        body: Box::new(body),
-      })
+      body = Stmt::While(WhileStmt { condition, body: Box::new(body) });
     }
 
     if let Some(initializer) = initializer {
@@ -198,15 +193,12 @@ impl<'a> Parser<'a> {
     let condition = self.parse_expression()?;
     self.consume_expecting(RightParen, "expected `)` after `condition`")?;
     let then_branch = Box::new(self.parse_statement()?);
-    let else_branch = match self.consume_discarding(Else) {
-      true => Some(Box::new(self.parse_statement()?)),
-      false => None,
+    let else_branch = if self.consume_discarding(Else) {
+      Some(Box::new(self.parse_statement()?))
+    } else {
+      None
     };
-    Ok(Stmt::If(IfStmt {
-      condition,
-      then_branch,
-      else_branch,
-    }))
+    Ok(Stmt::If(IfStmt { condition, then_branch, else_branch }))
   }
 
   fn parse_expression_stmt(&mut self) -> Result<Stmt> {
@@ -318,11 +310,9 @@ impl<'a> Parser<'a> {
       if self.consume_discarding(LeftParen) {
         expr = self.finish_call(expr)?;
       } else if self.consume_discarding(Dot) {
-        let name = self.consume_expecting(Identifier, "expected property name after `.`")?;
-        expr = Expr::Get(Get {
-          name,
-          object: Box::new(expr),
-        });
+        let name =
+          self.consume_expecting(Identifier, "expected property name after `.`")?;
+        expr = Expr::Get(Get { name, object: Box::new(expr) });
       } else {
         break;
       }
@@ -332,7 +322,7 @@ impl<'a> Parser<'a> {
 
   fn finish_call(&mut self, callee: Expr) -> Result<Expr> {
     let mut args = Vec::new();
-    if !self.peek_is(&RightParen) {
+    if !self.peek_is(RightParen) {
       loop {
         args.push(self.parse_expression()?);
         if !self.consume_discarding(Comma) {
@@ -354,25 +344,16 @@ impl<'a> Parser<'a> {
     } else if self.consume_discarding(True) {
       Ok(Expr::Literal(Literal::True))
     } else if let Some(token) = self.consume_if(This) {
-      Ok(Expr::This(expr::This {
-        keyword: token,
-        distance: None,
-      }))
+      Ok(Expr::This(expr::This { keyword: token, distance: None }))
     } else if let Some(keyword) = self.consume_if(Super) {
       self.consume_expecting(Dot, "expected `.` after `super`")?;
-      let method = self.consume_expecting(Identifier, "expected superclass method name")?;
-      Ok(Expr::Super(expr::Super {
-        keyword,
-        method,
-        distance: None,
-      }))
+      let method =
+        self.consume_expecting(Identifier, "expected superclass method name")?;
+      Ok(Expr::Super(expr::Super { keyword, method, distance: None }))
     } else if self.consume_discarding(Nil) {
       Ok(Expr::Literal(Literal::Nil))
     } else if let Some(token) = self.consume_if(Identifier) {
-      Ok(Expr::Variable(Variable {
-        name: token,
-        distance: None,
-      }))
+      Ok(Expr::Variable(Variable { name: token, distance: None }))
     } else if let Some(token) = self.consume_one_of(&[Number, Str]) {
       match token {
         Token::Number(_, number) => Ok(Expr::Literal(Literal::Number(number))),
@@ -390,13 +371,12 @@ impl<'a> Parser<'a> {
 
   fn synchronize_after_error(&mut self) {
     while !self.is_at_end() {
-      if self.consume_discarding(Semicolon) {
+      if self.consume_discarding(Semicolon)
+        || self.peek_one_of(&[Class, Fun, Var, For, If, While, Print, Return])
+      {
         return;
-      } else if self.peek_one_of(&[Class, Fun, Var, For, If, While, Print, Return]) {
-        return;
-      } else {
-        self.tokens.next();
       }
+      self.tokens.next();
     }
   }
 
@@ -405,11 +385,9 @@ impl<'a> Parser<'a> {
     token_type: TokenType,
     error_message: &'static str,
   ) -> Result<Token> {
-    if let Some(token) = self.consume_if(token_type) {
-      Ok(token)
-    } else {
-      Err(self.parse_error(error_message))
-    }
+    self
+      .consume_if(token_type)
+      .map_or_else(|| Err(self.parse_error(error_message)), Ok)
   }
 
   fn consume_discarding(&mut self, token_type: TokenType) -> bool {
@@ -425,20 +403,20 @@ impl<'a> Parser<'a> {
   }
 
   fn consume_if(&mut self, token_type: TokenType) -> Option<Token> {
-    if self.peek_is(&token_type) {
+    if self.peek_is(token_type) {
       return self.tokens.next();
     }
     None
   }
 
-  fn peek_is(&mut self, token_type: &TokenType) -> bool {
+  fn peek_is(&mut self, token_type: TokenType) -> bool {
     let peeked = self.tokens.peek();
-    !peeked.is_none() && peeked.unwrap().is_type(*token_type)
+    peeked.is_some() && peeked.unwrap().is_type(token_type)
   }
 
   fn peek_one_of(&mut self, token_types: &[TokenType]) -> bool {
     for token_type in token_types {
-      if self.peek_is(token_type) {
+      if self.peek_is(*token_type) {
         return true;
       }
     }
@@ -454,12 +432,12 @@ impl<'a> Parser<'a> {
     S: Into<String>,
   {
     LoxErr::Parse {
-      line: self.tokens.peek().map(Token::line).unwrap_or(0),
+      line: self.tokens.peek().map_or(0, Token::line),
       message: message.into(),
     }
   }
 
-  pub fn new(source: &'a String) -> Self {
+  pub fn new(source: &'a str) -> Self {
     Parser {
       tokens: Scanner::new(source).peekable(),
     }
@@ -472,29 +450,29 @@ impl<'a> Parser<'a> {
   }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum FnKind {
   Function,
   Method,
 }
 
 impl FnKind {
-  fn ident_error(&self) -> &'static str {
+  const fn ident_error(self) -> &'static str {
     match self {
-      FnKind::Function => "expected function name",
-      FnKind::Method => "expected method name",
+      Self::Function => "expected function name",
+      Self::Method => "expected method name",
     }
   }
-  fn lparen_error(&self) -> &'static str {
+  const fn lparen_error(self) -> &'static str {
     match self {
-      FnKind::Function => "expected `(` after function name",
-      FnKind::Method => "expected `(` after method name",
+      Self::Function => "expected `(` after function name",
+      Self::Method => "expected `(` after method name",
     }
   }
-  fn lbrace_error(&self) -> &'static str {
+  const fn lbrace_error(self) -> &'static str {
     match self {
-      FnKind::Function => "expected `{` before function body",
-      FnKind::Method => "expected `{` before method body",
+      Self::Function => "expected `{` before function body",
+      Self::Method => "expected `{` before method body",
     }
   }
 }
@@ -659,7 +637,7 @@ mod tests {
       (
         "super.foo(true)",
         Expr::Call(Call {
-          callee: Box::new(Expr::Super(Super {
+          callee: Box::new(Expr::Super(expr::Super {
             keyword: Token::Super(1),
             method: Token::Identifier(1, "foo".to_string()),
             distance: None,
@@ -768,14 +746,14 @@ mod tests {
       (
         "(true; *;",
         LoxErr::Many(vec![
-          Box::new(LoxErr::Parse {
+          LoxErr::Parse {
             line: 1,
             message: "expected `)` after expression".to_string(),
-          }),
-          Box::new(LoxErr::Parse {
+          },
+          LoxErr::Parse {
             line: 1,
             message: "expected an expression".to_string(),
-          }),
+          },
         ]),
       ),
     ];
@@ -898,7 +876,7 @@ mod tests {
     assert_parsed_statements(vec![
       (
         "class Breakfast {}",
-        Stmt::Class(Class {
+        Stmt::Class(stmt::Class {
           name: Token::Identifier(1, "Breakfast".to_string()),
           superclass: None,
           methods: vec![],
@@ -906,7 +884,7 @@ mod tests {
       ),
       (
         "class Breakfast < Meal {}",
-        Stmt::Class(Class {
+        Stmt::Class(stmt::Class {
           name: Token::Identifier(1, "Breakfast".to_string()),
           superclass: Some(Expr::Variable(Variable {
             name: Token::Identifier(1, "Meal".to_string()),
@@ -917,7 +895,7 @@ mod tests {
       ),
       (
         "class Breakfast { foo() { nil; } }",
-        Stmt::Class(Class {
+        Stmt::Class(stmt::Class {
           name: Token::Identifier(1, "Breakfast".to_string()),
           methods: vec![FnStmt {
             name: Token::Identifier(1, "foo".to_string()),

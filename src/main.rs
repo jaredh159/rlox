@@ -17,7 +17,7 @@ mod visit;
 
 fn main() {
   let args = std::env::args().skip(1).collect::<Vec<_>>();
-  if let Err(err) = rlox::run(args) {
+  if let Err(err) = rlox::run(&args) {
     err.print();
     err.exit();
   }

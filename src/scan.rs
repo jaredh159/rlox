@@ -9,26 +9,26 @@ pub struct Scanner<'a> {
 }
 
 static KEYWORDS: phf::Map<&'static str, fn(usize) -> Token> = phf_map! {
-  "and" => |line| Token::And(line),
-  "class" => |line| Token::Class(line),
-  "else" => |line| Token::Else(line),
-  "false" => |line| Token::False(line),
-  "for" => |line| Token::For(line),
-  "fun" => |line| Token::Fun(line),
-  "if" => |line| Token::If(line),
-  "nil" => |line| Token::Nil(line),
-  "or" => |line| Token::Or(line),
-  "print" => |line| Token::Print(line),
-  "return" => |line| Token::Return(line),
-  "super" => |line| Token::Super(line),
-  "this" => |line| Token::This(line),
-  "true" => |line| Token::True(line),
-  "var" => |line| Token::Var(line),
-  "while" => |line| Token::While(line),
+  "and" => Token::And,
+  "class" => Token::Class,
+  "else" => Token::Else,
+  "false" => Token::False,
+  "for" => Token::For,
+  "fun" => Token::Fun,
+  "if" => Token::If,
+  "nil" => Token::Nil,
+  "or" => Token::Or,
+  "print" => Token::Print,
+  "return" => Token::Return,
+  "super" => Token::Super,
+  "this" => Token::This,
+  "true" => Token::True,
+  "var" => Token::Var,
+  "while" => Token::While,
 };
 
 impl<'a> Scanner<'a> {
-  pub fn new(source: &'a String) -> Self {
+  pub fn new(source: &'a str) -> Self {
     Scanner {
       source: PeekTwo::new(source.chars()),
       line: 1,
@@ -57,11 +57,11 @@ impl<'a> Scanner<'a> {
   }
 
   fn advance_if(&mut self, expected: char) -> bool {
-    if !self.peek_is(expected) {
-      false
-    } else {
+    if self.peek_is(expected) {
       self.advance();
       true
+    } else {
+      false
     }
   }
 
@@ -85,22 +85,22 @@ impl<'a> Scanner<'a> {
 
   fn peek_is(&mut self, ch: char) -> bool {
     let peeked = self.source.peek();
-    !peeked.is_none() && *peeked.unwrap() == ch
+    peeked.is_some() && *peeked.unwrap() == ch
   }
 
   fn peek_satisfies(&mut self, predicate: fn(&char) -> bool) -> bool {
     let peeked = self.source.peek();
-    !peeked.is_none() && predicate(peeked.unwrap())
+    peeked.is_some() && predicate(peeked.unwrap())
   }
 
   fn peek_next_is(&mut self, ch: char) -> bool {
     let peeked_next = self.source.peek_next();
-    !peeked_next.is_none() && *peeked_next.unwrap() == ch
+    peeked_next.is_some() && *peeked_next.unwrap() == ch
   }
 
   fn peek_next_satisfies(&mut self, predicate: fn(&char) -> bool) -> bool {
     let peeked_next = self.source.peek_next();
-    !peeked_next.is_none() && predicate(peeked_next.unwrap())
+    peeked_next.is_some() && predicate(peeked_next.unwrap())
   }
 
   fn string(&mut self) -> Token {
@@ -143,7 +143,7 @@ impl<'a> Scanner<'a> {
 
   fn identifier(&mut self, first: char) -> Token {
     let mut chars = vec![first];
-    while self.peek_satisfies(is_alpha_numeric) {
+    while self.peek_satisfies(|c| is_alpha_numeric(*c)) {
       chars.push(self.advance().unwrap());
     }
     let ident: String = chars.iter().collect();
@@ -215,11 +215,11 @@ impl<'a> Iterator for Scanner<'a> {
         }
       }
       ch if ch.is_ascii_digit() => self.number(ch),
-      ch if is_alpha(&ch) => self.identifier(ch),
+      ch if is_alpha(ch) => self.identifier(ch),
       ch => {
         self.errors.push(LoxErr::Scan {
           line: self.line,
-          message: format!("Unexpected character: {}", char),
+          message: format!("Unexpected character: {char}"),
         });
         Token::Illegal(self.line, ch.to_string())
       }
@@ -228,11 +228,11 @@ impl<'a> Iterator for Scanner<'a> {
   }
 }
 
-fn is_alpha(ch: &char) -> bool {
-  ch.is_ascii_alphabetic() || *ch == '_'
+const fn is_alpha(ch: char) -> bool {
+  ch.is_ascii_alphabetic() || ch == '_'
 }
 
-fn is_alpha_numeric(ch: &char) -> bool {
+const fn is_alpha_numeric(ch: char) -> bool {
   is_alpha(ch) || ch.is_ascii_digit()
 }
 

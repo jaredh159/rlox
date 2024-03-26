@@ -22,11 +22,11 @@ pub struct Instance {
 }
 
 impl Instance {
-  pub fn get(name: &Token, instance: Rc<RefCell<Self>>) -> Result<Obj> {
+  pub fn get(name: &Token, instance: &Rc<RefCell<Self>>) -> Result<Obj> {
     if let Some(field) = instance.borrow().fields.get(name.lexeme()) {
       Ok(field.clone())
     } else if let Some(method) = instance.borrow().class.find_method(name.lexeme()) {
-      Ok(Obj::Func(method.bind(Rc::clone(&instance))))
+      Ok(Obj::Func(method.bind(Rc::clone(instance))))
     } else {
       Err(LoxErr::Runtime {
         line: name.line(),
@@ -45,16 +45,16 @@ impl Class {
     self
       .methods
       .get(name)
-      .or(self.superclass.as_ref().and_then(|s| s.find_method(name)))
+      .or_else(|| self.superclass.as_ref().and_then(|s| s.find_method(name)))
   }
 
   pub fn find_method_mut(&mut self, name: &str) -> Option<&mut Func> {
-    self.methods.get_mut(name).or(
+    self.methods.get_mut(name).or_else(|| {
       self
         .superclass
         .as_mut()
-        .and_then(|s| s.find_method_mut(name)),
-    )
+        .and_then(|s| s.find_method_mut(name))
+    })
   }
 }
 
@@ -73,7 +73,7 @@ impl Callable for Class {
   }
 
   fn arity(&self) -> usize {
-    self.methods.get("init").map_or(0, |init| init.arity())
+    self.methods.get("init").map_or(0, Callable::arity)
   }
 }
 

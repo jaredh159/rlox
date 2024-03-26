@@ -7,8 +7,8 @@ pub struct PeekTwo<I: Iterator> {
 }
 
 impl<I: Iterator> PeekTwo<I> {
-  pub fn new(iter: I) -> PeekTwo<I> {
-    PeekTwo {
+  pub fn new(iter: I) -> Self {
+    Self {
       peekable: iter.peekable(),
       peeked: None,
     }
@@ -40,7 +40,7 @@ impl<I: Iterator> Iterator for PeekTwo<I> {
     panic!("count not implemented for PeekTwo")
   }
 
-  fn nth(self: &mut PeekTwo<I>, _: usize) -> Option<I::Item> {
+  fn nth(&mut self, _: usize) -> Option<I::Item> {
     panic!("nth not implemented for PeekTwo")
   }
 
@@ -56,7 +56,7 @@ impl<I: Iterator> Iterator for PeekTwo<I> {
 
 #[test]
 fn test_peek_two() {
-  let chars = vec!['a', 'b', 'c', 'd', 'e'];
+  let chars = ['a', 'b', 'c', 'd', 'e'];
   let mut sut = PeekTwo::new(chars.iter());
   assert_eq!(sut.peek(), Some(&&'a'));
   assert_eq!(sut.peek_next(), Some(&&'b'));

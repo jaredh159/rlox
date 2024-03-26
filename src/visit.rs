@@ -41,18 +41,18 @@ pub trait StmtVisitable {
 impl ExprVisitable for Expr {
   fn accept<V: ExprVisitor>(&mut self, visitor: &mut V) -> V::Result {
     match self {
-      Expr::Binary(binary) => visitor.visit_binary(binary),
-      Expr::Unary(unary) => visitor.visit_unary(unary),
-      Expr::Literal(literal) => visitor.visit_literal(literal),
-      Expr::Grouping(grouping) => visitor.visit_grouping(grouping),
-      Expr::Variable(token) => visitor.visit_variable(token),
-      Expr::Assign(assign) => visitor.visit_assign(assign),
-      Expr::Logical(logical) => visitor.visit_logical(logical),
-      Expr::Call(call) => visitor.visit_call(call),
-      Expr::Get(get) => visitor.visit_get(get),
-      Expr::Set(set) => visitor.visit_set(set),
-      Expr::This(this) => visitor.visit_this(this),
-      Expr::Super(super_expr) => visitor.visit_super(super_expr),
+      Self::Binary(binary) => visitor.visit_binary(binary),
+      Self::Unary(unary) => visitor.visit_unary(unary),
+      Self::Literal(literal) => visitor.visit_literal(literal),
+      Self::Grouping(grouping) => visitor.visit_grouping(grouping),
+      Self::Variable(token) => visitor.visit_variable(token),
+      Self::Assign(assign) => visitor.visit_assign(assign),
+      Self::Logical(logical) => visitor.visit_logical(logical),
+      Self::Call(call) => visitor.visit_call(call),
+      Self::Get(get) => visitor.visit_get(get),
+      Self::Set(set) => visitor.visit_set(set),
+      Self::This(this) => visitor.visit_this(this),
+      Self::Super(super_expr) => visitor.visit_super(super_expr),
     }
   }
 }
@@ -60,15 +60,15 @@ impl ExprVisitable for Expr {
 impl StmtVisitable for Stmt {
   fn accept<V: StmtVisitor>(&mut self, visitor: &mut V) -> V::Result {
     match self {
-      Stmt::Expression(expr) => visitor.visit_expression(expr),
-      Stmt::Print(expr) => visitor.visit_print(expr),
-      Stmt::Var { name, initializer } => visitor.visit_var(name, initializer.as_mut()),
-      Stmt::Block(stmts) => visitor.visit_block(stmts),
-      Stmt::If(if_stmt) => visitor.visit_if(if_stmt),
-      Stmt::While(while_stmt) => visitor.visit_while(while_stmt),
-      Stmt::Function(fn_stmt) => visitor.visit_fn(fn_stmt),
-      Stmt::Return { keyword, value } => visitor.visit_return(keyword, value.as_mut()),
-      Stmt::Class(class) => visitor.visit_class(class),
+      Self::Expression(expr) => visitor.visit_expression(expr),
+      Self::Print(expr) => visitor.visit_print(expr),
+      Self::Var { name, initializer } => visitor.visit_var(name, initializer.as_mut()),
+      Self::Block(stmts) => visitor.visit_block(stmts),
+      Self::If(if_stmt) => visitor.visit_if(if_stmt),
+      Self::While(while_stmt) => visitor.visit_while(while_stmt),
+      Self::Function(fn_stmt) => visitor.visit_fn(fn_stmt),
+      Self::Return { keyword, value } => visitor.visit_return(keyword, value.as_mut()),
+      Self::Class(class) => visitor.visit_class(class),
     }
   }
 }

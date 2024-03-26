@@ -11,7 +11,7 @@ pub enum LoxErr {
   Parse { line: usize, message: String },
   Runtime { line: usize, message: String },
   Resolve { line: usize, message: String },
-  Many(Vec<Box<LoxErr>>),
+  Many(Vec<LoxErr>),
 }
 
 impl LoxErr {
@@ -21,12 +21,10 @@ impl LoxErr {
 
   pub fn exit(&self) -> ! {
     match self {
-      LoxErr::Io(_) => std::process::exit(74),
-      LoxErr::Scan { .. } => std::process::exit(65),
-      LoxErr::Parse { .. } => std::process::exit(65),
-      LoxErr::Runtime { .. } => std::process::exit(70),
-      LoxErr::Resolve { .. } => std::process::exit(70),
-      LoxErr::Many(errs) => errs
+      Self::Io(_) => std::process::exit(74),
+      Self::Scan { .. } | Self::Parse { .. } => std::process::exit(65),
+      Self::Runtime { .. } | Self::Resolve { .. } => std::process::exit(70),
+      Self::Many(errs) => errs
         .first()
         .map_or_else(|| std::process::exit(1), |err| err.exit()),
     }
@@ -36,12 +34,20 @@ impl LoxErr {
 impl Display for LoxErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      LoxErr::Io(msg) => write!(f, "IO Error: {}", msg),
-      LoxErr::Scan { line, message } => write!(f, "Scan Error: [line {}] {}", line, message),
-      LoxErr::Parse { line, message } => write!(f, "Parse Error: [line {}] {}", line, message),
-      LoxErr::Runtime { line, message } => write!(f, "Runtime Error: [line {}] {}", line, message),
-      LoxErr::Resolve { line, message } => write!(f, "Resolve Error: [line {}] {}", line, message),
-      LoxErr::Many(errs) => {
+      Self::Io(msg) => write!(f, "IO Error: {msg}"),
+      Self::Scan { line, message } => {
+        write!(f, "Scan Error: [line {line}] {message}")
+      }
+      Self::Parse { line, message } => {
+        write!(f, "Parse Error: [line {line}] {message}")
+      }
+      Self::Runtime { line, message } => {
+        write!(f, "Runtime Error: [line {line}] {message}")
+      }
+      Self::Resolve { line, message } => {
+        write!(f, "Resolve Error: [line {line}] {message}")
+      }
+      Self::Many(errs) => {
         for err in errs {
           err.fmt(f)?;
         }
@@ -53,7 +59,7 @@ impl Display for LoxErr {
 
 impl From<io::Error> for LoxErr {
   fn from(io_err: io::Error) -> Self {
-    LoxErr::Io(io_err.to_string())
+    Self::Io(io_err.to_string())
   }
 }
 

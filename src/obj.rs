@@ -52,10 +52,10 @@ impl Callable for Func {
 }
 
 impl Func {
-  pub fn bind(&self, instance: Rc<RefCell<Instance>>) -> Func {
+  pub fn bind(&self, instance: Rc<RefCell<Instance>>) -> Self {
     let mut env = Env::new_enclosing(Rc::clone(&self.closure));
     env.define("this".to_string(), Obj::Instance(instance));
-    Func {
+    Self {
       decl: self.decl.clone(),
       closure: Rc::new(RefCell::new(env)),
       is_initializer: self.is_initializer,
@@ -69,7 +69,7 @@ impl Display for Func {
   }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum NativeFunc {
   Clock,
 }
@@ -77,7 +77,7 @@ pub enum NativeFunc {
 impl Display for NativeFunc {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      NativeFunc::Clock => write!(f, "<native fun: clock>"),
+      Self::Clock => write!(f, "<native fun: clock>"),
     }
   }
 }
@@ -85,7 +85,7 @@ impl Display for NativeFunc {
 impl Callable for NativeFunc {
   fn call(&mut self, _: &mut Interpreter, _: Vec<Obj>) -> Result<Obj> {
     match self {
-      NativeFunc::Clock => {
+      Self::Clock => {
         let duration_since_epoch = time::SystemTime::now()
           .duration_since(time::UNIX_EPOCH)
           .unwrap();
@@ -98,39 +98,41 @@ impl Callable for NativeFunc {
 
   fn arity(&self) -> usize {
     match self {
-      NativeFunc::Clock => 0,
+      Self::Clock => 0,
     }
   }
 }
 
 impl Obj {
-  pub fn is_truthy(&self) -> bool {
+  pub const fn is_truthy(&self) -> bool {
     match self {
-      Obj::Nil => false,
-      Obj::Bool(boolean) => *boolean,
+      Self::Nil => false,
+      Self::Bool(boolean) => *boolean,
       _ => true,
     }
   }
 
   pub fn callable(&mut self) -> Option<Box<dyn Callable>> {
     match self {
-      Obj::NativeFunc(func) => Some(Box::new(func.clone())),
-      Obj::Func(func) => Some(Box::new(func.clone())),
-      Obj::Class(class) => Some(Box::new(class.clone())),
+      Self::NativeFunc(func) => Some(Box::new(func.clone())),
+      Self::Func(func) => Some(Box::new(func.clone())),
+      Self::Class(class) => Some(Box::new(class.clone())),
       _ => None,
     }
   }
 
   pub fn print(&self) {
     match self {
-      Obj::Nil => println!("{}", "nil".blue()),
-      Obj::Bool(boolean) => println!("{}", boolean.to_string().green()),
-      Obj::Num(number) => println!("{}", number.to_string().magenta()),
-      Obj::Str(string) => println!("\"{}\"", string.cyan()),
-      Obj::NativeFunc(native_fn) => println!("{}", format!("{native_fn}").dimmed()),
-      Obj::Func(func) => println!("{}", format!("{func}").dimmed()),
-      Obj::Class(class) => println!("{}", format!("{class}").dimmed()),
-      Obj::Instance(instance) => println!("{}", format!("{}", instance.as_ref().borrow()).dimmed()),
+      Self::Nil => println!("{}", "nil".blue()),
+      Self::Bool(boolean) => println!("{}", boolean.to_string().green()),
+      Self::Num(number) => println!("{}", number.to_string().magenta()),
+      Self::Str(string) => println!("\"{}\"", string.cyan()),
+      Self::NativeFunc(native_fn) => println!("{}", format!("{native_fn}").dimmed()),
+      Self::Func(func) => println!("{}", format!("{func}").dimmed()),
+      Self::Class(class) => println!("{}", format!("{class}").dimmed()),
+      Self::Instance(instance) => {
+        println!("{}", format!("{}", instance.as_ref().borrow()).dimmed());
+      }
     }
   }
 }

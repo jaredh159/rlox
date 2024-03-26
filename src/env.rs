@@ -23,7 +23,7 @@ impl Env {
   }
 
   pub fn get_at(&self, distance: usize, name: &Token) -> Result<Obj> {
-    self.with_ancestor_at(distance, |env| env.get(&name))
+    self.with_ancestor_at(distance, |env| env.get(name))
   }
 
   pub fn assign_at(&mut self, distance: usize, name: &Token, value: Obj) -> Result<()> {
@@ -37,7 +37,7 @@ impl Env {
         if let Some(enclosing) = &self.enclosing {
           enclosing.borrow().get(name)
         } else if let Some(native_func) = resolve_native_func(name.lexeme()) {
-          Ok(native_func.clone())
+          Ok(native_func)
         } else {
           Err(LoxErr::Runtime {
             line: name.line(),
@@ -63,14 +63,14 @@ impl Env {
   }
 
   pub fn new() -> Self {
-    Env {
+    Self {
       enclosing: None,
       values: HashMap::new(),
     }
   }
 
-  pub fn new_enclosing(env: Rc<RefCell<Env>>) -> Self {
-    Env {
+  pub fn new_enclosing(env: Rc<RefCell<Self>>) -> Self {
+    Self {
       enclosing: Some(env),
       values: HashMap::new(),
     }
@@ -88,7 +88,7 @@ impl Env {
       .as_ref()
       .expect("expected enclosing environment")
       .borrow();
-    return enclosing.with_ancestor_at(distance - 1, f);
+    enclosing.with_ancestor_at(distance - 1, f)
   }
 
   fn with_ancestor_at_mut<F, T>(&mut self, distance: usize, f: F) -> T
@@ -103,7 +103,7 @@ impl Env {
       .as_ref()
       .expect("expected enclosing environment")
       .borrow_mut();
-    return enclosing.with_ancestor_at_mut(distance - 1, f);
+    enclosing.with_ancestor_at_mut(distance - 1, f)
   }
 }
 

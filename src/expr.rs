@@ -126,67 +126,65 @@ pub enum BinaryOp {
 }
 
 impl BinaryOp {
-  pub fn lexeme(&self) -> &'static str {
+  pub const fn lexeme(&self) -> &'static str {
     match self {
-      BinaryOp::Minus(_) => "-",
-      BinaryOp::Star(_) => "*",
-      BinaryOp::Slash(_) => "/",
-      BinaryOp::Plus(_) => "+",
-      BinaryOp::Bang(_) => "+",
-      BinaryOp::BangEqual(_) => "!=",
-      BinaryOp::Greater(_) => ">",
-      BinaryOp::GreaterEqual(_) => ">=",
-      BinaryOp::Less(_) => "<",
-      BinaryOp::LessEqual(_) => "<=",
-      BinaryOp::EqualEqual(_) => "==",
+      Self::Minus(_) => "-",
+      Self::Star(_) => "*",
+      Self::Slash(_) => "/",
+      Self::Plus(_) => "+",
+      Self::Bang(_) => "!",
+      Self::BangEqual(_) => "!=",
+      Self::Greater(_) => ">",
+      Self::GreaterEqual(_) => ">=",
+      Self::Less(_) => "<",
+      Self::LessEqual(_) => "<=",
+      Self::EqualEqual(_) => "==",
     }
   }
 
-  pub fn line(&self) -> &usize {
+  pub const fn line(&self) -> &usize {
     match self {
-      BinaryOp::Minus(line) => line,
-      BinaryOp::Star(line) => line,
-      BinaryOp::Slash(line) => line,
-      BinaryOp::Plus(line) => line,
-      BinaryOp::Bang(line) => line,
-      BinaryOp::BangEqual(line) => line,
-      BinaryOp::Greater(line) => line,
-      BinaryOp::GreaterEqual(line) => line,
-      BinaryOp::Less(line) => line,
-      BinaryOp::LessEqual(line) => line,
-      BinaryOp::EqualEqual(line) => line,
+      Self::Minus(line)
+      | Self::Star(line)
+      | Self::Slash(line)
+      | Self::Plus(line)
+      | Self::Bang(line)
+      | Self::BangEqual(line)
+      | Self::Greater(line)
+      | Self::GreaterEqual(line)
+      | Self::Less(line)
+      | Self::LessEqual(line)
+      | Self::EqualEqual(line) => line,
     }
   }
 }
 
 impl UnaryOp {
-  pub fn lexeme(&self) -> &'static str {
+  pub const fn lexeme(&self) -> &'static str {
     match self {
-      UnaryOp::Minus(_) => "-",
-      UnaryOp::Bang(_) => "+",
+      Self::Minus(_) => "-",
+      Self::Bang(_) => "+",
     }
   }
 
-  pub fn line(&self) -> &usize {
+  pub const fn line(&self) -> &usize {
     match self {
-      UnaryOp::Minus(line) => line,
-      UnaryOp::Bang(line) => line,
+      Self::Minus(line) | Self::Bang(line) => line,
     }
   }
 }
 
 impl LogicalOp {
-  pub fn lexeme(&self) -> &'static str {
+  pub const fn lexeme(&self) -> &'static str {
     match self {
-      LogicalOp::And(_) => "and",
-      LogicalOp::Or(_) => "or",
+      Self::And(_) => "and",
+      Self::Or(_) => "or",
     }
   }
 
-  pub fn line(&self) -> &usize {
+  pub const fn line(&self) -> &usize {
     match self {
-      LogicalOp::And(line) => line,
-      LogicalOp::Or(line) => line,
+      Self::And(line) | Self::Or(line) => line,
     }
   }
 }
@@ -195,17 +193,17 @@ impl TryFrom<Token> for BinaryOp {
   type Error = LoxErr;
   fn try_from(token: Token) -> Result<Self, Self::Error> {
     match token.get_type() {
-      TokenType::Minus => Ok(BinaryOp::Minus(token.line())),
-      TokenType::Star => Ok(BinaryOp::Star(token.line())),
-      TokenType::Slash => Ok(BinaryOp::Slash(token.line())),
-      TokenType::Bang => Ok(BinaryOp::Bang(token.line())),
-      TokenType::BangEqual => Ok(BinaryOp::BangEqual(token.line())),
-      TokenType::Greater => Ok(BinaryOp::Greater(token.line())),
-      TokenType::GreaterEqual => Ok(BinaryOp::GreaterEqual(token.line())),
-      TokenType::Less => Ok(BinaryOp::Less(token.line())),
-      TokenType::LessEqual => Ok(BinaryOp::LessEqual(token.line())),
-      TokenType::EqualEqual => Ok(BinaryOp::EqualEqual(token.line())),
-      TokenType::Plus => Ok(BinaryOp::Plus(token.line())),
+      TokenType::Minus => Ok(Self::Minus(token.line())),
+      TokenType::Star => Ok(Self::Star(token.line())),
+      TokenType::Slash => Ok(Self::Slash(token.line())),
+      TokenType::Bang => Ok(Self::Bang(token.line())),
+      TokenType::BangEqual => Ok(Self::BangEqual(token.line())),
+      TokenType::Greater => Ok(Self::Greater(token.line())),
+      TokenType::GreaterEqual => Ok(Self::GreaterEqual(token.line())),
+      TokenType::Less => Ok(Self::Less(token.line())),
+      TokenType::LessEqual => Ok(Self::LessEqual(token.line())),
+      TokenType::EqualEqual => Ok(Self::EqualEqual(token.line())),
+      TokenType::Plus => Ok(Self::Plus(token.line())),
       _ => Err(LoxErr::Parse {
         line: token.line(),
         message: format!("invalid token `{}` for binary operator", token.lexeme()),
@@ -218,8 +216,8 @@ impl TryFrom<Token> for UnaryOp {
   type Error = LoxErr;
   fn try_from(token: Token) -> Result<Self, Self::Error> {
     match token.get_type() {
-      TokenType::Minus => Ok(UnaryOp::Minus(token.line())),
-      TokenType::Bang => Ok(UnaryOp::Bang(token.line())),
+      TokenType::Minus => Ok(Self::Minus(token.line())),
+      TokenType::Bang => Ok(Self::Bang(token.line())),
       _ => Err(LoxErr::Parse {
         line: token.line(),
         message: format!("invalid token `{}` for unary operator", token.lexeme()),
@@ -232,8 +230,8 @@ impl TryFrom<Token> for LogicalOp {
   type Error = LoxErr;
   fn try_from(token: Token) -> Result<Self, Self::Error> {
     match token.get_type() {
-      TokenType::And => Ok(LogicalOp::And(token.line())),
-      TokenType::Or => Ok(LogicalOp::Or(token.line())),
+      TokenType::And => Ok(Self::And(token.line())),
+      TokenType::Or => Ok(Self::Or(token.line())),
       _ => Err(LoxErr::Parse {
         line: token.line(),
         message: format!("invalid token `{}` for logical operator", token.lexeme()),
@@ -247,7 +245,7 @@ impl Resolvable for Assign {
     &self.name
   }
   fn set_distance(&mut self, distance: usize) {
-    self.distance = Some(distance)
+    self.distance = Some(distance);
   }
   fn get_distance(&self) -> Option<usize> {
     self.distance
@@ -259,7 +257,7 @@ impl Resolvable for Super {
     &self.keyword
   }
   fn set_distance(&mut self, distance: usize) {
-    self.distance = Some(distance)
+    self.distance = Some(distance);
   }
   fn get_distance(&self) -> Option<usize> {
     self.distance
@@ -271,7 +269,7 @@ impl Resolvable for This {
     &self.keyword
   }
   fn set_distance(&mut self, distance: usize) {
-    self.distance = Some(distance)
+    self.distance = Some(distance);
   }
   fn get_distance(&self) -> Option<usize> {
     self.distance
@@ -283,7 +281,7 @@ impl Resolvable for Variable {
     &self.name
   }
   fn set_distance(&mut self, distance: usize) {
-    self.distance = Some(distance)
+    self.distance = Some(distance);
   }
   fn get_distance(&self) -> Option<usize> {
     self.distance

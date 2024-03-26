@@ -21,7 +21,7 @@ pub struct Interpreter {
 impl Interpreter {
   pub fn interpret(&mut self, statements: &mut Vec<Stmt>) -> Result<()> {
     for statement in statements {
-      if self.return_value != None {
+      if self.return_value.is_some() {
         return Ok(());
       }
       statement.accept(self)?;
@@ -47,11 +47,11 @@ impl Interpreter {
 
   pub fn new() -> Self {
     let globals = Rc::new(RefCell::new(Env::new()));
-    return Interpreter::new_with_env(Rc::clone(&globals), globals);
+    Self::new_with_env(Rc::clone(&globals), globals)
   }
 
   pub fn new_with_env(env: Rc<RefCell<Env>>, globals: Rc<RefCell<Env>>) -> Self {
-    Interpreter {
+    Self {
       env,
       globals,
       return_value: None,
@@ -59,7 +59,7 @@ impl Interpreter {
     }
   }
 
-  fn lookup_variable(&self, variable: &mut impl Resolvable) -> Result<Obj> {
+  fn lookup_variable(&self, variable: &impl Resolvable) -> Result<Obj> {
     variable
       .get_distance()
       .map_or(self.globals.borrow().get(variable.name()), |distance| {
@@ -76,10 +76,10 @@ impl Interpreter {
   }
 
   fn scope(&mut self, env: Option<Rc<RefCell<Env>>>) -> Self {
-    Interpreter::new_with_env(
-      env.unwrap_or(Rc::new(RefCell::new(Env::new_enclosing(Rc::clone(
-        &self.env,
-      ))))),
+    Self::new_with_env(
+      env.unwrap_or_else(|| {
+        Rc::new(RefCell::new(Env::new_enclosing(Rc::clone(&self.env))))
+      }),
       Rc::clone(&self.globals),
     )
   }
@@ -122,7 +122,9 @@ impl StmtVisitor for Interpreter {
   }
 
   fn visit_while(&mut self, while_stmt: &mut WhileStmt) -> Self::Result {
-    while self.return_value == None && self.evaluate(&mut while_stmt.condition)?.is_truthy() {
+    while self.return_value.is_none()
+      && self.evaluate(&mut while_stmt.condition)?.is_truthy()
+    {
       while_stmt.body.accept(self)?;
     }
     Ok(())
@@ -182,7 +184,7 @@ impl StmtVisitor for Interpreter {
           decl: method.clone(),
           closure: super_env
             .as_ref()
-            .map_or_else(|| Rc::clone(&self.env), |super_env| Rc::clone(&super_env)),
+            .map_or_else(|| Rc::clone(&self.env), Rc::clone),
           is_initializer: method.name.lexeme() == "init",
         },
       );
@@ -206,8 +208,8 @@ impl ExprVisitor for Interpreter {
   type Result = Result<Obj>;
 
   fn visit_binary(&mut self, binary: &mut Binary) -> Self::Result {
-    let left = self.evaluate(&mut *binary.left)?;
-    let right = self.evaluate(&mut *binary.right)?;
+    let left = self.evaluate(&mut binary.left)?;
+    let right = self.evaluate(&mut binary.right)?;
     match (left, &binary.operator, right) {
       (Num(lhs), BinaryOp::Minus(_), Num(rhs)) => Ok(Num(lhs - rhs)),
       (Num(lhs), BinaryOp::Slash(_), Num(rhs)) => Ok(Num(lhs / rhs)),
@@ -222,25 +224,29 @@ impl ExprVisitor for Interpreter {
       (lhs, BinaryOp::BangEqual(_), rhs) => Ok(Bool(lhs != rhs)),
 
       // error cases
-      (_, BinaryOp::Minus(line), _)
-      | (_, BinaryOp::Slash(line), _)
-      | (_, BinaryOp::Greater(line), _)
-      | (_, BinaryOp::GreaterEqual(line), _)
-      | (_, BinaryOp::Less(line), _)
-      | (_, BinaryOp::LessEqual(line), _)
-      | (_, BinaryOp::Star(line), _) => Err(runtime(
-        line,
+      (
+        _,
+        BinaryOp::Minus(line)
+        | BinaryOp::Slash(line)
+        | BinaryOp::Greater(line)
+        | BinaryOp::GreaterEqual(line)
+        | BinaryOp::Less(line)
+        | BinaryOp::LessEqual(line)
+        | BinaryOp::Star(line),
+        _,
+      ) => Err(runtime(
+        *line,
         format!(
           "operands for binary `{}` must be numbers",
           binary.operator.lexeme()
         ),
       )),
       (_, BinaryOp::Plus(line), _) => Err(runtime(
-        line,
+        *line,
         "operands for binary `+` must be two numbers or two strings",
       )),
       _ => Err(runtime(
-        binary.operator.line(),
+        *binary.operator.line(),
         format!(
           "illegal usage of binary operator `{}`",
           binary.operator.lexeme()
@@ -250,7 +256,7 @@ impl ExprVisitor for Interpreter {
   }
 
   fn visit_assign(&mut self, assign: &mut Assign) -> Self::Result {
-    let value = self.evaluate(&mut *assign.value)?;
+    let value = self.evaluate(&mut assign.value)?;
     assign.distance.map_or(
       self
         .globals
@@ -267,7 +273,7 @@ impl ExprVisitor for Interpreter {
   }
 
   fn visit_grouping(&mut self, grouping: &mut Grouping) -> Self::Result {
-    self.evaluate(&mut *grouping.expr)
+    self.evaluate(&mut grouping.expr)
   }
 
   fn visit_literal(&mut self, literal: &mut Literal) -> Self::Result {
@@ -276,16 +282,18 @@ impl ExprVisitor for Interpreter {
       Literal::True => Ok(Bool(true)),
       Literal::False => Ok(Bool(false)),
       Literal::Number(number) => Ok(Num(*number)),
-      Literal::String(string) => Ok(Str(string.to_string())),
+      Literal::String(string) => Ok(Str((*string).to_string())),
     }
   }
 
   fn visit_unary(&mut self, unary: &mut Unary) -> Self::Result {
-    let right = self.evaluate(&mut *unary.right)?;
+    let right = self.evaluate(&mut unary.right)?;
     match (&unary.operator, right) {
       (UnaryOp::Bang(_), rhs) => Ok(Bool(rhs.is_truthy())),
       (UnaryOp::Minus(_), Num(number)) => Ok(Num(-number)),
-      (UnaryOp::Minus(line), _) => Err(runtime(line, "operand for unary `-` must be number")),
+      (UnaryOp::Minus(line), _) => {
+        Err(runtime(*line, "operand for unary `-` must be number"))
+      }
     }
   }
 
@@ -296,35 +304,34 @@ impl ExprVisitor for Interpreter {
   fn visit_logical(&mut self, logical: &mut Logical) -> Self::Result {
     let left = self.evaluate(&mut logical.left)?;
     match (logical.operator, left.is_truthy()) {
-      (LogicalOp::Or(_), true) => Ok(left),
-      (LogicalOp::And(_), false) => Ok(left),
+      (LogicalOp::Or(_), true) | (LogicalOp::And(_), false) => Ok(left),
       _ => self.evaluate(&mut logical.right),
     }
   }
 
   fn visit_call(&mut self, call: &mut Call) -> Self::Result {
-    let mut callee = self.evaluate(&mut *call.callee)?;
+    let mut callee = self.evaluate(&mut call.callee)?;
     let mut args = Vec::new();
-    for mut arg in &mut call.args {
-      args.push(self.evaluate(&mut arg)?);
+    for arg in &mut call.args {
+      args.push(self.evaluate(arg)?);
     }
     match callee.callable() {
       None => Err(runtime(
-        &call.paren.line(),
+        call.paren.line(),
         "can only call functions and classes",
       )),
       Some(mut callable) => {
-        if args.len() != callable.arity() {
+        if args.len() == callable.arity() {
+          callable.call(self, args)
+        } else {
           Err(runtime(
-            &call.paren.line(),
+            call.paren.line(),
             format!(
               "expected {} arguments but got {}",
               callable.arity(),
               args.len()
             ),
           ))
-        } else {
-          callable.call(self, args)
         }
       }
     }
@@ -333,7 +340,7 @@ impl ExprVisitor for Interpreter {
   fn visit_get(&mut self, get: &mut Get) -> Self::Result {
     let object = self.evaluate(&mut get.object)?;
     if let Obj::Instance(instance) = object {
-      oop::Instance::get(&get.name, instance)
+      oop::Instance::get(&get.name, &instance)
     } else {
       Err(LoxErr::Runtime {
         line: get.name.line(),
@@ -368,28 +375,25 @@ impl ExprVisitor for Interpreter {
       _ => panic!("unreachable"),
     }?;
     let this = Token::This(super_expr.keyword.line());
-    let instance = match self.env.borrow().get_at(distance - 1, &this)? {
-      Obj::Instance(instance) => instance,
-      _ => panic!("unreachable"),
+    let Obj::Instance(instance) = self.env.borrow().get_at(distance - 1, &this)? else {
+      panic!("unreachable")
     };
-    let method = superclass
-      .find_method(super_expr.method.lexeme())
-      .ok_or(LoxErr::Runtime {
-        line: super_expr.keyword.line(),
-        message: format!("undefined property `{}`", super_expr.method.lexeme()),
-      })?;
+    let method =
+      superclass
+        .find_method(super_expr.method.lexeme())
+        .ok_or(LoxErr::Runtime {
+          line: super_expr.keyword.line(),
+          message: format!("undefined property `{}`", super_expr.method.lexeme()),
+        })?;
     Ok(Obj::Func(method.bind(instance)))
   }
 }
 
-fn runtime<S>(line: &usize, message: S) -> LoxErr
+fn runtime<S>(line: usize, message: S) -> LoxErr
 where
   S: Into<String>,
 {
-  LoxErr::Runtime {
-    line: *line,
-    message: message.into(),
-  }
+  LoxErr::Runtime { line, message: message.into() }
 }
 
 // tests
@@ -443,7 +447,7 @@ mod tests {
 
   #[test]
   fn test_weird_scope_issue() {
-    let input = r#"
+    let input = "
       var a = 7;
       {
         fun returnA() {
@@ -455,7 +459,7 @@ mod tests {
         var c = returnA();
         b + c; // should be 14
       }
-      "#;
+      ";
     assert_eq!(interpret(input).unwrap(), Obj::Num(14.0));
   }
 
@@ -637,6 +641,7 @@ mod tests {
   }
 
   #[test]
+  #[allow(clippy::too_many_lines)]
   fn test_interpret_errors() {
     let cases = vec![
       (
@@ -757,9 +762,8 @@ mod tests {
     let mut stmts = parser.parse().unwrap();
     resolve(&mut stmts)?;
     assert_eq!(stmts.len(), 1);
-    let mut expr = match stmts.pop().unwrap() {
-      Stmt::Expression(expr) => expr,
-      _ => panic!("expected expression statement"),
+    let Stmt::Expression(mut expr) = stmts.pop().unwrap() else {
+      panic!("expected expression statement")
     };
     interpreter.evaluate(&mut expr)
   }
